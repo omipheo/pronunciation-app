@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Pronunciation</string>
+
+    <string name="section_alphabet">Alphabet</string>
+    <string name="section_training">Training</string>
+    <string name="section_game">Game</string>
+
+    <string name="engine_loading">Loading the pronunciation model…</string>
+    <string name="engine_missing">No pronunciation model installed. Run tools/prepare_assets.py and rebuild — see SETUP.md.</string>
+    <string name="engine_error">The pronunciation model could not be loaded. Check Logcat for details.</string>
+    <string name="tts_missing">US English voice data is not installed. Add it in Settings → System → Languages → Text-to-speech.</string>
+
+    <string name="start_recording">Record</string>
+    <string name="stop_recording">Stop</string>
+    <string name="listen">Listen</string>
+    <string name="listen_slow">Slowly</string>
+    <string name="next">Next</string>
+    <string name="skip">Skip</string>
+    <string name="analysing">Analysing…</string>
+
+    <string name="alphabet_header">Tap a letter to hear how it is named and the sound it makes.</string>
+    <string name="letter_name">Letter name</string>
+    <string name="letter_sound">Sound</string>
+    <string name="example_word">Example</string>
+    <string name="play_slowly">Play slowly</string>
+
+    <string name="training_intro">Read the prompt aloud. Every sound you produce is compared against the expected pronunciation.</string>
+    <string name="unit_word">Words</string>
+    <string name="unit_sentence">Sentences</string>
+    <string name="unit_paragraph">Paragraphs</string>
+    <string name="your_score">Your score</string>
+
+    <string name="game_title">Read it right</string>
+    <string name="game_intro">Five sentences. Twenty-five seconds each. Read each one clearly before the timer runs out.</string>
+    <string name="start_game">Start</string>
+    <string name="play_again">Play again</string>
+    <string name="new_best">New best score!</string>
+    <string name="best_score">Best: %1$d</string>
+    <string name="round_of">Round %1$d of %2$d</string>
+    <string name="streak">%1$d in a row</string>
+</resources>

@@ -1,0 +1,28 @@
+*.iml
+.gradle/
+/.idea/
+.DS_Store
+# Trailing slash, no leading slash: matches app/build/ too, not just the root.
+build/
+/captures
+.externalNativeBuild
+.cxx
+local.properties
+
+# Machine-local tool state
+.claude/settings.local.json
+
+# Generated assets — large binaries, rebuild with tools/prepare_assets.py
+app/src/main/assets/phoneme_model.onnx
+app/src/main/assets/lexicon.txt
+app/src/main/assets/vocab.json
+app/src/main/assets/model_config.json
+tools/.cache/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# env
+.env

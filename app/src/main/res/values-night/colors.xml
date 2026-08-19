@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Lightened so they clear the 4.5:1 contrast bar against the dark surface. -->
+    <color name="score_good">#81C784</color>
+    <color name="score_ok">#FFB74D</color>
+    <color name="score_bad">#EF9A9A</color>
+    <color name="score_missing">#757575</color>
+</resources>

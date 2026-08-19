@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/nav_graph"
+    app:startDestination="@id/alphabetFragment">
+
+    <fragment
+        android:id="@+id/alphabetFragment"
+        android:name="com.example.pronunciation.ui.alphabet.AlphabetFragment"
+        android:label="@string/section_alphabet" />
+
+    <fragment
+        android:id="@+id/trainingFragment"
+        android:name="com.example.pronunciation.ui.training.TrainingFragment"
+        android:label="@string/section_training" />
+
+    <fragment
+        android:id="@+id/gameFragment"
+        android:name="com.example.pronunciation.ui.game.GameFragment"
+        android:label="@string/section_game" />
+
+</navigation>

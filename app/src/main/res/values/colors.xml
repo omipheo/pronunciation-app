@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Feedback colours. Chosen to stay distinguishable for red/green colour blindness by
+         pairing every colour with a shape cue (bold, strikethrough) in ScoreFormatter. -->
+    <color name="score_good">#2E7D32</color>
+    <color name="score_ok">#E08600</color>
+    <color name="score_bad">#C62828</color>
+    <color name="score_missing">#9E9E9E</color>
+
+    <color name="ic_launcher_background">#1565C0</color>
+</resources>

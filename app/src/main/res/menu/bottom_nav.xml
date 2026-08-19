@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <item
+        android:id="@+id/alphabetFragment"
+        android:icon="@drawable/ic_alphabet"
+        android:title="@string/section_alphabet" />
+
+    <item
+        android:id="@+id/trainingFragment"
+        android:icon="@drawable/ic_training"
+        android:title="@string/section_training" />
+
+    <item
+        android:id="@+id/gameFragment"
+        android:icon="@drawable/ic_game"
+        android:title="@string/section_game" />
+
+</menu>
