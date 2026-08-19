@@ -19,7 +19,7 @@
     <string name="home_weak_sounds_sub">Ranked by how often you get them wrong.</string>
     <string name="home_continue">Keep practising</string>
     <string name="home_link_training">Read prompts and get per-sound feedback</string>
-    <string name="home_link_game">Five sentences against the clock</string>
+    <string name="home_link_game">Ten passages, each harder than the last</string>
     <string name="home_link_alphabet">Hear how each letter is named and sounds</string>
 
     <string name="stat_attempts">attempts</string>
