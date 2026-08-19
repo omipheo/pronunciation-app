@@ -129,28 +129,37 @@
                     tools:text="164" />
             </LinearLayout>
 
-            <!-- The fish only moves when a sentence is read correctly. -->
-            <com.example.pronunciation.ui.game.FishProgressView
-                android:id="@+id/fish"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="10dp" />
-
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
                 app:cardCornerRadius="16dp"
                 app:cardElevation="0dp"
                 app:strokeWidth="1dp">
 
-                <TextView
-                    android:id="@+id/passage_text"
+                <!-- Fixed height with its own scroll: a four-paragraph passage would otherwise
+                     push Record off-screen, and it is tapped once per sentence. -->
+                <ScrollView
+                    android:id="@+id/passage_scroll"
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:lineSpacingMultiplier="1.3"
-                    android:padding="18dp"
-                    android:textAppearance="?attr/textAppearanceBodyLarge"
-                    tools:text="Please miss a cheaper flight slowly. Do I plan the earlier train?" />
+                    android:layout_height="300dp"
+                    android:scrollbars="vertical">
+
+                    <!-- The fish is drawn inside this view, above the sentence being read. The
+                         extra line spacing is the gap it swims in; tighten it and the fish
+                         collides with the line above. -->
+                    <com.example.pronunciation.ui.game.PassageTextView
+                        android:id="@+id/passage_text"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:lineSpacingExtra="15dp"
+                        android:paddingStart="18dp"
+                        android:paddingTop="22dp"
+                        android:paddingEnd="18dp"
+                        android:paddingBottom="18dp"
+                        android:textAppearance="?attr/textAppearanceBodyLarge"
+                        tools:text="Please miss a cheaper flight slowly. Do I plan the earlier train?" />
+                </ScrollView>
             </com.google.android.material.card.MaterialCardView>
 
             <TextView

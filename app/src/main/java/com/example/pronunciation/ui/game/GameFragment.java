@@ -74,7 +74,7 @@ public class GameFragment extends RecordingFragment {
 
         int fishColor = ContextCompat.getColor(requireContext(), R.color.fish);
         int waterColor = ContextCompat.getColor(requireContext(), R.color.water);
-        binding.fish.setColors(fishColor, waterColor);
+        binding.passageText.setFishColor(fishColor);
         binding.idleFish.setColors(fishColor, waterColor);
         binding.idleFish.resetTo(0.12f);
 
@@ -137,10 +137,10 @@ public class GameFragment extends RecordingFragment {
         sentenceIndex = 0;
         attempts = 0;
 
-        binding.fish.setSteps(problem.sentenceCount());
-        binding.fish.resetTo(0f);
         binding.roundFeedback.setVisibility(View.GONE);
         renderPassage();
+        binding.passageText.jumpTo(currentSentenceStart());
+        binding.passageScroll.scrollTo(0, 0);
     }
 
     private void renderPassage() {
@@ -149,6 +149,12 @@ public class GameFragment extends RecordingFragment {
                 problem.title, sentenceIndex + 1, problem.sentenceCount()));
         binding.runningScore.setText(String.valueOf(totalScore));
         binding.passageText.setText(buildPassage());
+    }
+
+    /** Character offset the fish should sit above: the start of the sentence to read next. */
+    private int currentSentenceStart() {
+        if (problem == null || sentenceIndex >= problem.spans.size()) return -1;
+        return problem.spans.get(sentenceIndex)[0];
     }
 
     /** Done sentences in green, the one to read now highlighted, the rest muted. */
@@ -245,7 +251,6 @@ public class GameFragment extends RecordingFragment {
         sentenceIndex++;
         attempts = 0;
 
-        binding.fish.swimTo(sentenceIndex / (float) problem.sentenceCount());
         binding.roundFeedback.setVisibility(View.VISIBLE);
         binding.roundFeedback.setText(getString(R.string.game_passed, score.overallPercent, earned));
         binding.roundFeedback.setTextColor(
@@ -254,7 +259,16 @@ public class GameFragment extends RecordingFragment {
         if (sentenceIndex >= problem.sentenceCount()) {
             binding.getRoot().postDelayed(this::finishRound, 1100);
         } else {
+            // Re-highlight first, then swim — the new text must be laid out before the fish can
+            // resolve where the next sentence starts.
             renderPassage();
+            binding.passageText.post(() -> {
+                if (binding == null) return;
+                int offset = currentSentenceStart();
+                binding.passageText.swimTo(offset);
+                // Follow the fish, or it swims off the bottom of a long passage.
+                binding.passageScroll.smoothScrollTo(0, binding.passageText.scrollTargetFor(offset));
+            });
         }
     }
 

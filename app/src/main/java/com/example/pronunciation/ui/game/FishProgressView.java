@@ -137,21 +137,6 @@ public class FishProgressView extends View {
 
         float cx = left + (right - left) * progress;
         float cy = lineY - r * 1.15f;
-        drawFish(canvas, cx, cy, r);
-    }
-
-    private void drawFish(Canvas canvas, float cx, float cy, float r) {
-        // Tail first, so the body overlaps its base.
-        path.reset();
-        path.moveTo(cx - r * 0.85f, cy);
-        path.lineTo(cx - r * 1.55f, cy - r * 0.55f);
-        path.lineTo(cx - r * 1.55f, cy + r * 0.55f);
-        path.close();
-        canvas.drawPath(path, body);
-
-        oval.set(cx - r, cy - r * 0.62f, cx + r, cy + r * 0.62f);
-        canvas.drawOval(oval, body);
-
-        canvas.drawCircle(cx + r * 0.45f, cy - r * 0.14f, r * 0.16f, eye);
+        FishDrawing.draw(canvas, cx, cy, r, body, eye, path, oval);
     }
 }
