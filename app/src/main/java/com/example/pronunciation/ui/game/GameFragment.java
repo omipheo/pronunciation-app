@@ -182,6 +182,7 @@ public class GameFragment extends RecordingFragment {
             public void onScored(UtteranceScore score) {
                 if (binding == null) return;
                 busy = false;
+                stats.record(score);
                 binding.analysingBar.setVisibility(View.GONE);
                 finishRound(score.overallPercent, feedbackFor(score));
             }

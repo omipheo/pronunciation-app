@@ -42,7 +42,12 @@ including a portable no-admin setup.
 toolbar `...` → Microphone → "Virtual microphone uses host audio input". It is off by default,
 so recordings capture silence and everything scores 0%.
 
-## The three sections
+## The four sections
+
+**0. Main** — where practice stands: attempts, average score, day streak, and the sounds you get
+wrong most often, ranked by error rate and labelled with an example word ("θ as in think"). Also
+the way into everything else. Stats come from `PracticeStats`, a handful of counters in
+`SharedPreferences` that Training and Game fold each scored attempt into.
 
 **1. Alphabet** — an A–Z grid. Tapping a letter opens its name in IPA, the sound(s) it makes,
 and an example word, each playable through the system TTS at normal or half speed.
@@ -114,10 +119,14 @@ app/src/main/java/com/example/pronunciation/
     TtsSpeaker              system TTS wrapper
   ui/
     RecordingFragment       shared mic permission + recorder plumbing
+    home/                   Main tab - progress dashboard
     alphabet/               Section 1
     training/               Section 2
     game/                   Section 3
-  data/                     alphabet table and practice content
+  data/
+    Alphabet, Lessons       A-Z table and practice content
+    PracticeStats           attempt counters, streak, per-phoneme error rates
+    Phonemes                IPA symbol -> example word, for readable feedback
 tools/prepare_assets.py     model export + lexicon generation (desktop, run once)
 ```
 

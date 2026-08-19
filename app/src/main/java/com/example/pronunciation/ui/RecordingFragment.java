@@ -15,6 +15,7 @@ import androidx.fragment.app.Fragment;
 import com.example.pronunciation.PronunciationApp;
 import com.example.pronunciation.audio.AudioRecorder;
 import com.example.pronunciation.audio.TtsSpeaker;
+import com.example.pronunciation.data.PracticeStats;
 import com.example.pronunciation.speech.SpeechEngine;
 import com.google.android.material.snackbar.Snackbar;
 
@@ -26,6 +27,8 @@ public abstract class RecordingFragment extends Fragment {
 
     protected final AudioRecorder recorder = new AudioRecorder();
     protected SpeechEngine engine;
+    /** Every scored attempt is folded in here so the Main tab has something to show. */
+    protected PracticeStats stats;
 
     private ActivityResultLauncher<String> permissionLauncher;
 
@@ -34,6 +37,7 @@ public abstract class RecordingFragment extends Fragment {
         super.onCreate(savedInstanceState);
         engine = SpeechEngine.get(requireContext());
         engine.init();
+        stats = new PracticeStats(requireContext());
 
         permissionLauncher = registerForActivityResult(
                 new ActivityResultContracts.RequestPermission(), granted -> {

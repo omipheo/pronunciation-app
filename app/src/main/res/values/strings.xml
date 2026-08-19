@@ -2,9 +2,30 @@
 <resources>
     <string name="app_name">Pronunciation</string>
 
+    <string name="section_home">Main</string>
     <string name="section_alphabet">Alphabet</string>
     <string name="section_training">Training</string>
     <string name="section_game">Game</string>
+
+    <string name="greeting_morning">Good morning</string>
+    <string name="greeting_afternoon">Good afternoon</string>
+    <string name="greeting_evening">Good evening</string>
+
+    <string name="home_sub_first_time">Read something aloud and see which sounds need work.</string>
+    <string name="home_sub_streak">You have practised %1$d days in a row.</string>
+    <string name="home_sub_attempts">%1$d attempts recorded so far.</string>
+    <string name="home_empty">Your stats appear here once you have recorded something in Training or Game.</string>
+    <string name="home_weak_sounds">Sounds to work on</string>
+    <string name="home_weak_sounds_sub">Ranked by how often you get them wrong.</string>
+    <string name="home_continue">Keep practising</string>
+    <string name="home_link_training">Read prompts and get per-sound feedback</string>
+    <string name="home_link_game">Five sentences against the clock</string>
+    <string name="home_link_alphabet">Hear how each letter is named and sounds</string>
+
+    <string name="stat_attempts">attempts</string>
+    <string name="stat_average">average</string>
+    <string name="stat_streak">day streak</string>
+    <string name="weak_sound_chip">%1$s · %2$d%% wrong</string>
 
     <string name="engine_loading">Loading the pronunciation model…</string>
     <string name="engine_missing">No pronunciation model installed. Run tools/prepare_assets.py and rebuild — see SETUP.md.</string>

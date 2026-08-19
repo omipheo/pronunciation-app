@@ -174,6 +174,8 @@ public class TrainingFragment extends RecordingFragment {
     }
 
     private void render(UtteranceScore score) {
+        stats.record(score);
+
         binding.resultGroup.setVisibility(View.VISIBLE);
         binding.overallPercent.setText(score.overallPercent + "%");
         binding.overallPercent.setTextColor(
