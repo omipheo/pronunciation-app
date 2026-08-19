@@ -49,6 +49,11 @@ wrong most often, ranked by error rate and labelled with an example word ("θ as
 the way into everything else. Stats come from `PracticeStats`, a handful of counters in
 `SharedPreferences` that Training and Game fold each scored attempt into.
 
+Tapping a weak sound opens Training filtered to just the prompts whose expected pronunciation
+contains it, easiest unit first — so the dashboard is actionable rather than only informative.
+The match runs against the real lexicon, ignoring stress and length marks, and Training says so
+plainly and falls back to the full list if nothing contains that sound.
+
 **1. Alphabet** — an A–Z grid. Tapping a letter opens its name in IPA, the sound(s) it makes,
 and an example word, each playable through the system TTS at normal or half speed.
 

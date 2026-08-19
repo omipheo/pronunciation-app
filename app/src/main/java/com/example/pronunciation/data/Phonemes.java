@@ -78,7 +78,7 @@ public final class Phonemes {
     /** @return an example word containing the sound, or null if we have none */
     public static String exampleFor(String phoneme) {
         if (phoneme == null) return null;
-        return EXAMPLES.get(strip(phoneme));
+        return EXAMPLES.get(normalize(phoneme));
     }
 
     /** "θ as in think", or just "θ" when there is no example. */
@@ -87,7 +87,14 @@ public final class Phonemes {
         return example == null ? phoneme : phoneme + " as in " + example;
     }
 
-    private static String strip(String p) {
-        return p.replace("ˈ", "").replace("ˌ", "").trim();
+    /**
+     * Drops stress and length marks so symbols compare as the same sound.
+     *
+     * <p>The model may emit "iː" where the lexicon holds "i"; treating those as different would
+     * make a sound look unpractisable when there is plenty of material for it.
+     */
+    public static String normalize(String phoneme) {
+        if (phoneme == null) return null;
+        return phoneme.replace("ˈ", "").replace("ˌ", "").replace("ː", "").trim();
     }
 }

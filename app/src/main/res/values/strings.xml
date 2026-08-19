@@ -26,6 +26,9 @@
     <string name="stat_average">average</string>
     <string name="stat_streak">day streak</string>
     <string name="weak_sound_chip">%1$s · %2$d%% wrong</string>
+    <string name="focus_practising">Practising %1$s</string>
+    <string name="focus_clear">Show all</string>
+    <string name="focus_none">No prompts contain %1$s yet — showing everything instead.</string>
 
     <string name="engine_loading">Loading the pronunciation model…</string>
     <string name="engine_missing">No pronunciation model installed. Run tools/prepare_assets.py and rebuild — see SETUP.md.</string>

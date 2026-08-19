@@ -133,6 +133,11 @@ public class SpeechEngine {
         });
     }
 
+    /** The loaded dictionary, or null before {@link State#READY}. */
+    public Lexicon lexicon() {
+        return lexicon;
+    }
+
     /** The expected IPA for a word, for display next to a prompt. Null if unknown or not loaded. */
     public String expectedIpa(String word) {
         if (lexicon == null) return null;

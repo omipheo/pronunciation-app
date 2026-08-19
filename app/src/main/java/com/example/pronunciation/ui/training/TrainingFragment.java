@@ -7,11 +7,14 @@ import android.view.ViewGroup;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.lifecycle.ViewModelProvider;
 import androidx.recyclerview.widget.LinearLayoutManager;
 
 import com.example.pronunciation.R;
 import com.example.pronunciation.data.Lesson;
 import com.example.pronunciation.data.Lessons;
+import com.example.pronunciation.data.Phonemes;
+import com.example.pronunciation.ui.PracticeFocusViewModel;
 import com.example.pronunciation.databinding.FragmentTrainingBinding;
 import com.example.pronunciation.speech.SpeechEngine;
 import com.example.pronunciation.speech.UtteranceScore;
@@ -34,6 +37,10 @@ public class TrainingFragment extends RecordingFragment {
     private List<Lesson> lessons = Lessons.byUnit(Lesson.Unit.WORD);
     private int index = 0;
     private boolean busy = false;
+    /** Non-null while drilling one sound picked from the Main tab. */
+    private String focusPhoneme;
+    /** Requested before the lexicon finished loading; applied once the engine is ready. */
+    private String pendingFocus;
 
     @Nullable
     @Override
@@ -52,7 +59,7 @@ public class TrainingFragment extends RecordingFragment {
         binding.wordScores.setAdapter(scoreAdapter);
 
         binding.unitChips.setOnCheckedStateChangeListener((group, checkedIds) -> {
-            if (checkedIds.isEmpty()) return;
+            if (checkedIds.isEmpty() || focusPhoneme != null) return;
             int id = checkedIds.get(0);
             Lesson.Unit unit = id == R.id.chip_sentence ? Lesson.Unit.SENTENCE
                     : id == R.id.chip_paragraph ? Lesson.Unit.PARAGRAPH
@@ -61,6 +68,8 @@ public class TrainingFragment extends RecordingFragment {
             index = 0;
             showLesson();
         });
+
+        binding.focusClear.setOnClickListener(v -> clearFocus());
 
         binding.listenButton.setOnClickListener(v -> tts().speak(current().text));
         binding.listenSlowButton.setOnClickListener(v -> tts().speakSlowly(current().text));
@@ -73,6 +82,67 @@ public class TrainingFragment extends RecordingFragment {
         recorder.setLevelListener(level -> binding.levelMeter.setProgress((int) (level * 100)));
 
         engine.state().observe(getViewLifecycleOwner(), this::onEngineState);
+        showLesson();
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        String requested = new ViewModelProvider(requireActivity())
+                .get(PracticeFocusViewModel.class)
+                .consume();
+        if (requested != null) {
+            pendingFocus = requested;
+            tryApplyPendingFocus();
+        }
+    }
+
+    /**
+     * Applies a queued focus once the lexicon exists. Called again from the engine state
+     * observer, because a request can arrive while the model is still loading and there is no
+     * way to match prompts to a sound without the dictionary.
+     */
+    private void tryApplyPendingFocus() {
+        if (pendingFocus == null || binding == null) return;
+        if (engine.lexicon() == null) return;
+
+        String phoneme = pendingFocus;
+        pendingFocus = null;
+        applyFocus(phoneme);
+    }
+
+    /** Narrows the prompt list to those that actually contain the chosen sound. */
+    private void applyFocus(String phoneme) {
+        List<Lesson> matching = Lessons.containingPhoneme(phoneme, engine.lexicon());
+
+        if (matching.isEmpty()) {
+            // Better to say so than to silently show an unrelated list.
+            showMessage(getString(R.string.focus_none, Phonemes.describe(phoneme)));
+            clearFocus();
+            return;
+        }
+
+        focusPhoneme = phoneme;
+        lessons = matching;
+        index = 0;
+
+        binding.focusCard.setVisibility(View.VISIBLE);
+        binding.focusText.setText(getString(R.string.focus_practising, Phonemes.describe(phoneme)));
+        binding.unitChips.setVisibility(View.GONE);
+        showLesson();
+    }
+
+    private void clearFocus() {
+        focusPhoneme = null;
+        binding.focusCard.setVisibility(View.GONE);
+        binding.unitChips.setVisibility(View.VISIBLE);
+
+        int checked = binding.unitChips.getCheckedChipId();
+        Lesson.Unit unit = checked == R.id.chip_sentence ? Lesson.Unit.SENTENCE
+                : checked == R.id.chip_paragraph ? Lesson.Unit.PARAGRAPH
+                : Lesson.Unit.WORD;
+        lessons = Lessons.byUnit(unit);
+        index = 0;
         showLesson();
     }
 
@@ -118,6 +188,7 @@ public class TrainingFragment extends RecordingFragment {
                 break;
             case READY:
                 binding.engineBanner.setVisibility(View.GONE);
+                tryApplyPendingFocus();
                 showLesson();  // the IPA line only resolves once the lexicon is loaded
                 break;
             default:

@@ -1,5 +1,7 @@
 package com.example.pronunciation.data;
 
+import com.example.pronunciation.speech.Lexicon;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -58,6 +60,42 @@ public final class Lessons {
                             + "and within thirty minutes the rain was falling hard.",
                     "θ, ð and consonant clusters")
     ));
+
+    /**
+     * Every prompt whose expected pronunciation contains the given sound, easiest unit first.
+     *
+     * <p>Backs the "practise this sound" path from the Main tab: a weak sound is only actionable
+     * if it leads somewhere that actually drills it.
+     *
+     * @return matching prompts, or an empty list if the sound appears in none of them
+     */
+    public static List<Lesson> containingPhoneme(String phoneme, Lexicon lexicon) {
+        List<Lesson> out = new ArrayList<>();
+        if (phoneme == null || lexicon == null || !lexicon.isLoaded()) return out;
+
+        String target = Phonemes.normalize(phoneme);
+        if (target.isEmpty()) return out;
+
+        for (Lesson lesson : ALL) {
+            if (mentions(lesson.text, target, lexicon)) out.add(lesson);
+        }
+
+        // Words before sentences before paragraphs, so practice ramps up.
+        Collections.sort(out, (a, b) -> a.unit.ordinal() - b.unit.ordinal());
+        return out;
+    }
+
+    private static boolean mentions(String text, String target, Lexicon lexicon) {
+        for (String word : Lexicon.tokenize(text)) {
+            String[] phonemes = lexicon.lookup(word);
+            if (phonemes == null) continue;
+
+            for (String p : phonemes) {
+                if (Phonemes.normalize(p).equals(target)) return true;
+            }
+        }
+        return false;
+    }
 
     public static List<Lesson> byUnit(Lesson.Unit unit) {
         List<Lesson> out = new ArrayList<>();

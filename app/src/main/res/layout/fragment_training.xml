@@ -34,6 +34,45 @@
                 tools:text="Loading the pronunciation model…" />
         </com.google.android.material.card.MaterialCardView>
 
+        <!-- Shown when arriving from a weak sound on the Main tab. -->
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/focus_card"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp"
+            android:visibility="gone"
+            app:cardBackgroundColor="?attr/colorPrimaryContainer"
+            app:cardCornerRadius="12dp"
+            app:cardElevation="0dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingStart="14dp"
+                android:paddingTop="6dp"
+                android:paddingEnd="6dp"
+                android:paddingBottom="6dp">
+
+                <TextView
+                    android:id="@+id/focus_text"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:textAppearance="?attr/textAppearanceBodyMedium"
+                    android:textColor="?attr/colorOnPrimaryContainer"
+                    tools:text="Practising θ as in think" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/focus_clear"
+                    style="@style/Widget.Material3.Button.TextButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/focus_clear" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
         <com.google.android.material.chip.ChipGroup
             android:id="@+id/unit_chips"
             android:layout_width="match_parent"

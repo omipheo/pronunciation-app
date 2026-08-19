@@ -8,8 +8,10 @@ import android.view.ViewGroup;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
+import androidx.lifecycle.ViewModelProvider;
 
 import com.example.pronunciation.R;
+import com.example.pronunciation.ui.PracticeFocusViewModel;
 import com.example.pronunciation.data.Phonemes;
 import com.example.pronunciation.data.PracticeStats;
 import com.example.pronunciation.databinding.FragmentHomeBinding;
@@ -97,8 +99,13 @@ public class HomeFragment extends Fragment {
             chip.setText(getString(R.string.weak_sound_chip,
                     Phonemes.describe(weak.phoneme), weak.errorPercent));
             chip.setCheckable(false);
-            // Tapping a weak sound takes you somewhere you can actually practise it.
-            chip.setOnClickListener(v -> switchTo(R.id.trainingFragment));
+            // Tapping a weak sound takes you to Training with that sound already selected.
+            chip.setOnClickListener(v -> {
+                new ViewModelProvider(requireActivity())
+                        .get(PracticeFocusViewModel.class)
+                        .request(weak.phoneme);
+                switchTo(R.id.trainingFragment);
+            });
             binding.weakChips.addView(chip);
         }
     }
