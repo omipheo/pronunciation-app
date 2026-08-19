@@ -5,4 +5,8 @@
     <color name="score_ok">#FFB74D</color>
     <color name="score_bad">#EF9A9A</color>
     <color name="score_missing">#757575</color>
+
+    <color name="fish">#FFB74D</color>
+    <color name="water">#42627E</color>
+    <color name="current_sentence">#4A3F1E</color>
 </resources>

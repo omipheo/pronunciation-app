@@ -36,6 +36,13 @@ TARGET_WORDS = 1200
 TARGET_SENTENCES = 600
 TARGET_PARAGRAPHS = 350
 
+# Game problems: passages read aloud one sentence at a time, gated on getting each right.
+GAME_PROBLEMS = 320
+GAME_LEVELS = 10
+GAME_PARAGRAPHS = 3          # the floor; harder levels get more
+GAME_SENTENCES_PER_PARA = 3
+SENTENCE_POOL = 2600         # internal pool, larger than the practice corpus, for variety
+
 # Sounds non-native speakers lose most often, hardest first. A generated word's "focus" line
 # names the hardest sound it contains, so the prompt still teaches something.
 DIFFICULTY = ["θ", "ð", "ʒ", "ɹ", "ŋ", "ɚ", "ɝ", "v", "w", "ʃ", "tʃ", "dʒ",
@@ -214,9 +221,10 @@ FRAMES: list[tuple[str, bool, bool, bool]] = [
 ]
 
 
-def build_sentences(rng: random.Random) -> list[tuple[str, str, str, int]]:
-    """@return (text, focus, theme, frame_index)"""
-    out: list[tuple[str, str, str, int]] = []
+def build_sentences(rng: random.Random, limit: int = TARGET_SENTENCES
+                    ) -> list[tuple[str, str, str, int, str]]:
+    """@return (text, focus, theme, frame_index, object_phrase)"""
+    out: list[tuple[str, str, str, int, str]] = []
     seen: set[str] = set()
 
     combos = []
@@ -228,7 +236,7 @@ def build_sentences(rng: random.Random) -> list[tuple[str, str, str, int]]:
     rng.shuffle(combos)
 
     for theme, obj, base, third, fi in combos:
-        if len(out) >= TARGET_SENTENCES:
+        if len(out) >= limit:
             break
         frame, needs_base, plural_only, action_only = FRAMES[fi]
 
@@ -249,15 +257,15 @@ def build_sentences(rng: random.Random) -> list[tuple[str, str, str, int]]:
         if text in seen:
             continue
         seen.add(text)
-        out.append((text, f"connected speech — {theme}", theme, fi))
+        out.append((text, f"connected speech — {theme}", theme, fi, obj))
 
     return out
 
 
-def build_paragraphs(sentences: list[tuple[str, str, str, int]],
+def build_paragraphs(sentences: list[tuple[str, str, str, int, str]],
                      rng: random.Random) -> list[tuple[str, str]]:
     by_theme: dict[str, list[tuple[str, int]]] = {}
-    for text, _, theme, fi in sentences:
+    for text, _, theme, fi, _ in sentences:
         by_theme.setdefault(theme, []).append((text, fi))
 
     out: list[tuple[str, str]] = []
@@ -284,6 +292,127 @@ def build_paragraphs(sentences: list[tuple[str, str, str, int]],
 
 
 # ---------------------------------------------------------------------------------------
+# Game problems: multi-paragraph passages, banded into difficulty levels
+# ---------------------------------------------------------------------------------------
+
+# Sounds that actually cost a learner effort, and roughly what they cost.
+HARD_WEIGHTS = {"θ": 3, "ð": 3, "ʒ": 3, "ɹ": 2, "ŋ": 2, "ɚ": 2, "ɝ": 2,
+                "v": 2, "w": 1, "ʃ": 2, "tʃ": 2, "dʒ": 2, "æ": 1, "ʌ": 1,
+                "ʊ": 1, "ɔɪ": 2, "aʊ": 2}
+VOWELS = set("iɪɛæɑɔʊuʌəɚɝ") | {"eɪ", "aɪ", "ɔɪ", "aʊ", "oʊ", "iː", "uː"}
+
+
+def sentence_difficulty(text: str, lex: dict[str, list[str]]) -> float:
+    """Effort per word: hard sounds, consonant clusters and syllable count.
+
+    Per word rather than per sentence, so difficulty means "how hard are these words to say"
+    and not simply "how long is this".
+    """
+    total = 0.0
+    words = 0
+    for raw in text.split():
+        phones = lex.get(normalize(raw))
+        if not phones:
+            continue
+        words += 1
+
+        score = sum(HARD_WEIGHTS.get(p, 0) for p in phones)
+
+        run = 0
+        for p in phones:
+            if p in VOWELS:
+                run = 0
+            else:
+                run += 1
+                if run >= 3:
+                    score += 3      # three consonants in a row is a real obstacle
+        syllables = sum(1 for p in phones if p in VOWELS)
+        score += max(0, syllables - 1)
+        total += score
+
+    return total / words if words else 0.0
+
+
+def build_game_problems(sentences: list[tuple[str, str, str, int, str]],
+                        lex: dict[str, list[str]],
+                        rng: random.Random) -> list[tuple[int, str, list[str]]]:
+    """@return (level, title, paragraphs) with at least GAME_PARAGRAPHS paragraphs each."""
+    scored = [(sentence_difficulty(t, lex), t, theme, fi, obj)
+              for t, _, theme, fi, obj in sentences]
+    scored.sort(key=lambda r: r[0])
+
+    # Equal-count bands, so every level has material regardless of how the scores cluster.
+    band_size = max(1, len(scored) // GAME_LEVELS)
+    bands: list[list[tuple[float, str, str, int, str]]] = [
+        scored[i * band_size: (i + 1) * band_size] for i in range(GAME_LEVELS)
+    ]
+    bands[-1].extend(scored[GAME_LEVELS * band_size:])
+
+    per_level = GAME_PROBLEMS // GAME_LEVELS
+    out: list[tuple[int, str, list[str]]] = []
+    seen: set[str] = set()
+
+    for level in range(1, GAME_LEVELS + 1):
+        pool = bands[level - 1]
+        by_theme: dict[str, list[tuple[str, int, str]]] = {}
+        for _, text, theme, fi, obj in pool:
+            by_theme.setdefault(theme, []).append((text, fi, obj))
+        themes = [t for t in by_theme if len(by_theme[t]) >= GAME_SENTENCES_PER_PARA * 2]
+        if not themes:
+            themes = list(by_theme)
+
+        # Longer passages at higher levels, on top of harder sentences.
+        paragraphs_needed = GAME_PARAGRAPHS + (1 if level >= 7 else 0)
+        needed = paragraphs_needed * GAME_SENTENCES_PER_PARA
+
+        made, attempts = 0, 0
+        while made < per_level and attempts < per_level * 400:
+            attempts += 1
+            theme = rng.choice(themes)
+            available = by_theme[theme]
+            if len(available) < needed:
+                continue
+
+            picked = rng.sample(available, min(len(available), needed * 3))
+
+            # A passage that says "this difficult language" four times reads as filler. Each
+            # theme only has ~10 object phrases, so cap repeats rather than forbid them.
+            chosen: list[tuple[str, int, str]] = []
+            obj_counts: Counter = Counter()
+            frame_counts: Counter = Counter()
+            for cand in picked:
+                if len(chosen) >= needed:
+                    break
+                if obj_counts[cand[2]] >= 2 or frame_counts[cand[1]] >= 2:
+                    continue
+                chosen.append(cand)
+                obj_counts[cand[2]] += 1
+                frame_counts[cand[1]] += 1
+            if len(chosen) < needed:
+                continue
+
+            paragraphs = []
+            ok = True
+            for p in range(paragraphs_needed):
+                chunk = chosen[p * GAME_SENTENCES_PER_PARA:(p + 1) * GAME_SENTENCES_PER_PARA]
+                if len({fi for _, fi, _ in chunk}) < GAME_SENTENCES_PER_PARA:
+                    ok = False      # same frame twice reads as one sentence repeated
+                    break
+                paragraphs.append(" ".join(t for t, _, _ in chunk))
+            if not ok:
+                continue
+
+            key = "||".join(paragraphs)
+            if key in seen:
+                continue
+            seen.add(key)
+            out.append((level, f"{theme.title()} · level {level}", paragraphs))
+            made += 1
+
+    return out
+
+
+# ---------------------------------------------------------------------------------------
 
 def normalize(word: str) -> str:
     import re
@@ -298,19 +427,28 @@ def main() -> None:
     words = build_words(lex, freq)
     log(f"words: {len(words)}")
 
-    sentences = build_sentences(rng)
-    log(f"sentences: {len(sentences)}")
+    # One big pool feeds both the practice corpus and the game passages; the game needs far
+    # more raw material because each problem consumes 9-12 sentences.
+    pool = build_sentences(rng, limit=SENTENCE_POOL)
+    sentences = pool[:TARGET_SENTENCES]
+    log(f"sentences: {len(sentences)} (pool {len(pool)})")
 
     paragraphs = build_paragraphs(sentences, rng)
     log(f"paragraphs: {len(paragraphs)}")
 
+    problems = build_game_problems(pool, lex, rng)
+    log(f"game problems: {len(problems)}")
+
     rows = ([("WORD", t, f) for t, f in words]
-            + [("SENTENCE", t, f) for t, f, _, _ in sentences]
+            + [("SENTENCE", t, f) for t, f, _, _, _ in sentences]
             + [("PARAGRAPH", t, f) for t, f in paragraphs])
 
     # Refuse to ship a prompt containing a word the scorer cannot look up.
     bad = []
-    for unit, text, _ in rows:
+    checkable = [(u, t) for u, t, _ in rows] + [
+        ("GAME", " ".join(paras)) for _, _, paras in problems
+    ]
+    for unit, text in checkable:
         for raw in text.split():
             w = normalize(raw)
             if w and w not in lex:
@@ -325,6 +463,18 @@ def main() -> None:
     with OUT.open("w", encoding="utf-8", newline="\n") as fh:
         for unit, text, focus in rows:
             fh.write(f"{unit}\t{text}\t{focus}\n")
+
+    # level \t title \t paragraphs joined by ||
+    games = ASSETS / "game_problems.tsv"
+    with games.open("w", encoding="utf-8", newline="\n") as fh:
+        for level, title, paras in problems:
+            fh.write(f"{level}\t{title}\t{'||'.join(paras)}\n")
+
+    lengths = [len(" ".join(p).split()) for _, _, p in problems]
+    per_level = Counter(l for l, _, _ in problems)
+    log(f"wrote {games.name}: {len(problems)} problems, "
+        f"{min(lengths)}-{max(lengths)} words each, {games.stat().st_size / 1024:.0f} KB")
+    log("  per level: " + "  ".join(f"L{k}={per_level[k]}" for k in sorted(per_level)))
 
     coverage = Counter()
     for _, text, _ in rows:

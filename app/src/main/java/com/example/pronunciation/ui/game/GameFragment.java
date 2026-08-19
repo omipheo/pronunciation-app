@@ -1,18 +1,25 @@
 package com.example.pronunciation.ui.game;
 
 import android.content.SharedPreferences;
+import android.graphics.Typeface;
 import android.os.Bundle;
-import android.os.CountDownTimer;
+import android.text.SpannableStringBuilder;
+import android.text.Spanned;
+import android.text.style.BackgroundColorSpan;
+import android.text.style.ForegroundColorSpan;
+import android.text.style.StyleSpan;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.core.content.ContextCompat;
 
 import com.example.pronunciation.R;
-import com.example.pronunciation.data.Lesson;
-import com.example.pronunciation.data.LessonRepository;
+import com.example.pronunciation.data.GameProblem;
+import com.example.pronunciation.data.GameProblems;
+import com.example.pronunciation.data.GameScoring;
 import com.example.pronunciation.databinding.FragmentGameBinding;
 import com.example.pronunciation.speech.SpeechEngine;
 import com.example.pronunciation.speech.UtteranceScore;
@@ -20,33 +27,37 @@ import com.example.pronunciation.speech.WordScore;
 import com.example.pronunciation.ui.RecordingFragment;
 import com.example.pronunciation.ui.ScoreFormatter;
 
-import java.util.List;
+import java.util.Random;
 
 /**
- * Section 3 — a timed run of five sentences.
+ * Section 3 — read a multi-paragraph passage aloud, one sentence at a time.
  *
- * <p>Same engine as Section 2, different pressure: a countdown per round and a running score,
- * so the learner has to produce the sounds without rehearsing them first.
+ * <p>The fish above the passage only moves when a sentence is pronounced well enough. There is
+ * no way to skip a sentence: the point is that progress is earned, not that the passage is
+ * finished.
+ *
+ * <p>Ten rounds, one passage each, level 1 through 10. Scoring per sentence rather than per
+ * passage is a hard requirement, not a preference — a 90-word recording takes tens of seconds
+ * to run through the model, where a single sentence takes under a second.
  */
 public class GameFragment extends RecordingFragment {
 
-    private static final int ROUNDS = 5;
-    private static final int SECONDS_PER_ROUND = 25;
-    private static final int PASS_THRESHOLD = 70;
+    private static final int ROUNDS = GameProblems.LEVELS;
     private static final String PREFS = "game";
     private static final String KEY_BEST = "best_score";
 
     private FragmentGameBinding binding;
+    private GameProblems problems;
+    private final Random random = new Random();
 
-    private List<Lesson> round;
-    private int roundIndex = 0;
+    private GameProblem problem;
+    private int roundIndex = 0;       // 0-based; level is roundIndex + 1
+    private int sentenceIndex = 0;
+    private int attempts = 0;         // attempts at the current sentence
     private int totalScore = 0;
-    private int streak = 0;
     private boolean playing = false;
     private boolean busy = false;
-    /** Set when a run was abandoned by backgrounding; the screen resets on return. */
     private boolean abandoned = false;
-    private CountDownTimer timer;
 
     @Nullable
     @Override
@@ -59,13 +70,23 @@ public class GameFragment extends RecordingFragment {
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
+        problems = GameProblems.get(requireContext());
+
+        int fishColor = ContextCompat.getColor(requireContext(), R.color.fish);
+        int waterColor = ContextCompat.getColor(requireContext(), R.color.water);
+        binding.fish.setColors(fishColor, waterColor);
+        binding.idleFish.setColors(fishColor, waterColor);
+        binding.idleFish.resetTo(0.12f);
 
         binding.startButton.setOnClickListener(v -> startGame());
         binding.playAgainButton.setOnClickListener(v -> startGame());
         binding.recordButton.setOnClickListener(v -> toggleRecording());
-        binding.skipButton.setOnClickListener(v -> {
-            if (playing && !busy) finishRound(0, "Skipped");
+        binding.listenButton.setOnClickListener(v -> {
+            if (problem != null && sentenceIndex < problem.sentenceCount()) {
+                tts().speak(problem.sentences.get(sentenceIndex));
+            }
         });
+        binding.quitButton.setOnClickListener(v -> endGame());
 
         recorder.setLevelListener(level -> binding.levelMeter.setProgress((int) (level * 100)));
         engine.state().observe(getViewLifecycleOwner(), this::onEngineState);
@@ -98,60 +119,66 @@ public class GameFragment extends RecordingFragment {
     // --- game flow -------------------------------------------------------------------------
 
     private void startGame() {
-        round = LessonRepository.get(requireContext()).gameRound(ROUNDS, System.nanoTime());
         roundIndex = 0;
         totalScore = 0;
-        streak = 0;
         playing = true;
         showPlaying();
         startRound();
     }
 
     private void startRound() {
-        Lesson lesson = round.get(roundIndex);
-        binding.roundLabel.setText(getString(R.string.round_of, roundIndex + 1, round.size()));
-        binding.sentenceText.setText(lesson.text);
-        binding.runningScore.setText(String.valueOf(totalScore));
-        binding.streakLabel.setVisibility(streak >= 2 ? View.VISIBLE : View.GONE);
-        binding.streakLabel.setText(getString(R.string.streak, streak));
-        binding.roundFeedback.setVisibility(View.GONE);
-        binding.recordButton.setEnabled(engine.isReady());
-
-        startTimer();
-    }
-
-    private void startTimer() {
-        cancelTimer();
-        binding.timerBar.setMax(SECONDS_PER_ROUND * 10);
-        timer = new CountDownTimer(SECONDS_PER_ROUND * 1000L, 100) {
-            @Override
-            public void onTick(long remaining) {
-                if (binding == null) return;
-                binding.timerBar.setProgress((int) (remaining / 100));
-                binding.timerText.setText(String.valueOf((remaining / 1000) + 1));
-            }
-
-            @Override
-            public void onFinish() {
-                if (binding == null) return;
-                if (recorder.isRecording()) {
-                    stopAndScore();  // ran out mid-attempt; score what we got
-                } else {
-                    finishRound(0, "Out of time");
-                }
-            }
-        }.start();
-    }
-
-    private void cancelTimer() {
-        if (timer != null) {
-            timer.cancel();
-            timer = null;
+        problem = problems.randomForLevel(roundIndex + 1, random);
+        if (problem == null) {
+            showMessage(getString(R.string.game_no_problems));
+            endGame();
+            return;
         }
+
+        sentenceIndex = 0;
+        attempts = 0;
+
+        binding.fish.setSteps(problem.sentenceCount());
+        binding.fish.resetTo(0f);
+        binding.roundFeedback.setVisibility(View.GONE);
+        renderPassage();
+    }
+
+    private void renderPassage() {
+        binding.roundLabel.setText(getString(R.string.round_of, roundIndex + 1, ROUNDS));
+        binding.problemLabel.setText(getString(R.string.game_sentence_of,
+                problem.title, sentenceIndex + 1, problem.sentenceCount()));
+        binding.runningScore.setText(String.valueOf(totalScore));
+        binding.passageText.setText(buildPassage());
+    }
+
+    /** Done sentences in green, the one to read now highlighted, the rest muted. */
+    private CharSequence buildPassage() {
+        SpannableStringBuilder sb = new SpannableStringBuilder(problem.displayText);
+
+        int done = ContextCompat.getColor(requireContext(), R.color.score_good);
+        int upcoming = ContextCompat.getColor(requireContext(), R.color.score_missing);
+        int current = ContextCompat.getColor(requireContext(), R.color.current_sentence);
+
+        for (int i = 0; i < problem.spans.size(); i++) {
+            int[] span = problem.spans.get(i);
+            if (i < sentenceIndex) {
+                sb.setSpan(new ForegroundColorSpan(done), span[0], span[1],
+                        Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            } else if (i == sentenceIndex) {
+                sb.setSpan(new BackgroundColorSpan(current), span[0], span[1],
+                        Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                sb.setSpan(new StyleSpan(Typeface.BOLD), span[0], span[1],
+                        Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            } else {
+                sb.setSpan(new ForegroundColorSpan(upcoming), span[0], span[1],
+                        Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            }
+        }
+        return sb;
     }
 
     private void toggleRecording() {
-        if (busy || !playing) return;
+        if (busy || !playing || problem == null) return;
 
         if (recorder.isRecording()) {
             stopAndScore();
@@ -166,10 +193,10 @@ public class GameFragment extends RecordingFragment {
         binding.recordButton.setText(R.string.stop_recording);
         binding.recordButton.setIconResource(R.drawable.ic_stop);
         binding.levelMeter.setVisibility(View.VISIBLE);
+        binding.roundFeedback.setVisibility(View.GONE);
     }
 
     private void stopAndScore() {
-        cancelTimer();
         float[] samples = recorder.stop();
         resetRecordButton();
 
@@ -177,14 +204,16 @@ public class GameFragment extends RecordingFragment {
         binding.recordButton.setEnabled(false);
         binding.analysingBar.setVisibility(View.VISIBLE);
 
-        engine.score(round.get(roundIndex).text, samples, new SpeechEngine.ScoreCallback() {
+        final String target = problem.sentences.get(sentenceIndex);
+        engine.score(target, samples, new SpeechEngine.ScoreCallback() {
             @Override
             public void onScored(UtteranceScore score) {
                 if (binding == null) return;
                 busy = false;
                 stats.record(score);
                 binding.analysingBar.setVisibility(View.GONE);
-                finishRound(score.overallPercent, feedbackFor(score));
+                binding.recordButton.setEnabled(true);
+                judge(score);
             }
 
             @Override
@@ -194,56 +223,76 @@ public class GameFragment extends RecordingFragment {
                 binding.analysingBar.setVisibility(View.GONE);
                 binding.recordButton.setEnabled(true);
                 showMessage(message);
-                startTimer();  // give the round back rather than eating it
             }
         });
     }
 
-    private String feedbackFor(UtteranceScore score) {
-        if (score.overallPercent >= PASS_THRESHOLD) {
-            return "Clear — " + score.overallPercent + "%";
+    /** Advance only on a good enough attempt. Anything else leaves the fish where it is. */
+    private void judge(UtteranceScore score) {
+        attempts++;
+
+        if (!GameScoring.passes(score.overallPercent)) {
+            binding.roundFeedback.setVisibility(View.VISIBLE);
+            binding.roundFeedback.setText(retryMessage(score));
+            binding.roundFeedback.setTextColor(
+                    ScoreFormatter.colourForPercent(requireContext(), score.overallPercent));
+            return;
         }
-        WordScore weakest = score.weakestWord();
-        return weakest == null
-                ? "Missed it — " + score.overallPercent + "%"
-                : "\"" + weakest.word + "\" tripped you up — " + score.overallPercent + "%";
+
+        int earned = GameScoring.pointsFor(score.overallPercent, attempts);
+        totalScore += earned;
+
+        sentenceIndex++;
+        attempts = 0;
+
+        binding.fish.swimTo(sentenceIndex / (float) problem.sentenceCount());
+        binding.roundFeedback.setVisibility(View.VISIBLE);
+        binding.roundFeedback.setText(getString(R.string.game_passed, score.overallPercent, earned));
+        binding.roundFeedback.setTextColor(
+                ContextCompat.getColor(requireContext(), R.color.score_good));
+
+        if (sentenceIndex >= problem.sentenceCount()) {
+            binding.getRoot().postDelayed(this::finishRound, 1100);
+        } else {
+            renderPassage();
+        }
     }
 
-    private void finishRound(int percent, String feedback) {
-        cancelTimer();
-        if (recorder.isRecording()) recorder.cancel();
-        resetRecordButton();
+    private String retryMessage(UtteranceScore score) {
+        if (score.isEmpty()) {
+            return getString(R.string.game_heard_nothing);
+        }
+        WordScore weakest = score.weakestWord();
+        if (weakest != null) {
+            String hint = ScoreFormatter.substitutionHint(weakest);
+            if (hint != null) {
+                return getString(R.string.game_retry_word, weakest.word, hint);
+            }
+            return getString(R.string.game_retry_simple, weakest.word, score.overallPercent);
+        }
+        return getString(R.string.game_retry_generic, score.overallPercent);
+    }
 
-        totalScore += percent;
-        streak = percent >= PASS_THRESHOLD ? streak + 1 : 0;
-
-        binding.roundFeedback.setVisibility(View.VISIBLE);
-        binding.roundFeedback.setText(feedback);
-        binding.roundFeedback.setTextColor(
-                ScoreFormatter.colourForPercent(requireContext(), percent));
-        binding.runningScore.setText(String.valueOf(totalScore));
+    private void finishRound() {
+        if (binding == null || !playing) return;
 
         roundIndex++;
-        if (roundIndex >= round.size()) {
-            binding.getRoot().postDelayed(this::endGame, 1200);
+        if (roundIndex >= ROUNDS) {
+            endGame();
         } else {
-            binding.getRoot().postDelayed(() -> {
-                if (binding != null && playing) startRound();
-            }, 1200);
+            startRound();
         }
     }
 
     private void endGame() {
         if (binding == null) return;
         playing = false;
-        cancelTimer();
+        if (recorder.isRecording()) recorder.cancel();
+        resetRecordButton();
 
-        int max = round.size() * 100;
-        int percent = max == 0 ? 0 : totalScore * 100 / max;
-
-        binding.finalScore.setText(totalScore + " / " + max);
-        binding.finalVerdict.setText(verdictFor(percent));
-        binding.finalStars.setText(stars(percent));
+        binding.finalScore.setText(String.valueOf(totalScore));
+        binding.finalVerdict.setText(verdictFor(roundIndex));
+        binding.finalStars.setText(stars(roundIndex));
 
         int best = bestScore();
         if (totalScore > best) {
@@ -258,18 +307,17 @@ public class GameFragment extends RecordingFragment {
         showFinished();
     }
 
-    private static String stars(int percent) {
-        int earned = percent >= 90 ? 3 : percent >= 70 ? 2 : percent >= 45 ? 1 : 0;
+    /** Stars reflect how far through the ten rounds the reader got. */
+    private static String stars(int roundsCompleted) {
+        int earned = roundsCompleted >= ROUNDS ? 3 : roundsCompleted >= 6 ? 2 : roundsCompleted >= 3 ? 1 : 0;
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < 3; i++) sb.append(i < earned ? "★" : "☆");
         return sb.toString();
     }
 
-    private static String verdictFor(int percent) {
-        if (percent >= 90) return "Outstanding.";
-        if (percent >= 70) return "Solid run.";
-        if (percent >= 45) return "Keep at it.";
-        return "Try the training section first.";
+    private String verdictFor(int roundsCompleted) {
+        if (roundsCompleted >= ROUNDS) return getString(R.string.game_verdict_all);
+        return getString(R.string.game_verdict_partial, roundsCompleted, ROUNDS);
     }
 
     // --- view states -----------------------------------------------------------------------
@@ -321,8 +369,6 @@ public class GameFragment extends RecordingFragment {
     @Override
     public void onStart() {
         super.onStart();
-        // A run cannot be resumed fairly after being backgrounded, so start over cleanly
-        // rather than leaving a stopped clock on screen.
         if (abandoned && binding != null) {
             abandoned = false;
             showIdle();
@@ -332,7 +378,6 @@ public class GameFragment extends RecordingFragment {
     @Override
     public void onStop() {
         super.onStop();
-        cancelTimer();
         if (playing) {
             playing = false;
             abandoned = true;
@@ -342,7 +387,6 @@ public class GameFragment extends RecordingFragment {
     @Override
     public void onDestroyView() {
         super.onDestroyView();
-        cancelTimer();
         recorder.setLevelListener(null);
         binding = null;
     }

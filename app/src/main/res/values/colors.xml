@@ -7,5 +7,11 @@
     <color name="score_bad">#C62828</color>
     <color name="score_missing">#9E9E9E</color>
 
+    <!-- The game's progress fish and the line it swims along. -->
+    <color name="fish">#EF6C00</color>
+    <color name="water">#90CAF9</color>
+    <!-- Behind the sentence the reader must say next; light enough to keep text readable. -->
+    <color name="current_sentence">#FFF3C4</color>
+
     <color name="ic_launcher_background">#1565C0</color>
 </resources>
