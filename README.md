@@ -150,6 +150,23 @@ cross-word boundaries, unknown words and silence. That is where scoring bugs hid
 
 ## Content
 
-Practice prompts live in `data/Lessons.java` and lean on sounds that are hard for non-native
-speakers — θ/ð, l/r, v/w, ʃ/tʃ and the short/long vowel pairs. A generic sentence scores well
-without teaching anything, so the prompts are deliberately awkward.
+Practice prompts live in `data/Lessons.java` — **130 of them**: 85 words, 37 sentences, 8
+paragraphs. They lean on the contrasts non-native speakers actually lose: θ/ð, l/ɹ, v/w, ʃ/tʃ/ʒ,
+ɪ/iː, æ/ʌ and the unstressed schwa. A generic sentence scores well without teaching anything, so
+the prompts are deliberately awkward.
+
+Two invariants are enforced rather than assumed:
+
+```bash
+python tools/check_content.py
+```
+
+- **Every prompt word must be in the lexicon.** An unknown word is greyed out and excluded from
+  scoring, so a typo silently produces a prompt that teaches nothing. This caught "practising" —
+  CMUdict is US English and has only "practicing".
+- **Every phoneme must appear in at least 3 prompts.** Otherwise the Main tab can tell you a
+  sound is your weakest and then have nothing to practise it with. This caught ɔɪ sitting at a
+  single prompt.
+
+It also verifies every phoneme has an example word for the "θ as in think" labels. The script
+exits non-zero on failure, so it can gate a commit.
