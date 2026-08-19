@@ -3,7 +3,44 @@
 An offline Android app for practising English pronunciation. Java + XML Views, minSdk 26.
 No network calls at runtime — the speech model runs on the device.
 
-New here? Start with [SETUP.md](SETUP.md); nothing is installed on this machine yet.
+## Quick start
+
+Already have Android Studio (or a JDK 17 + Android SDK)? From the project root:
+
+```bash
+# 1. Generate the speech model and lexicon (once, ~15 min, needs internet)
+pip install torch transformers onnx onnxruntime onnxscript
+python tools/prepare_assets.py
+
+# 2. Build
+./gradlew assembleDebug        # gradlew.bat on Windows
+
+# 3. Install on a connected device
+./gradlew installDebug
+```
+
+APKs land in `app/build/outputs/apk/debug/` — use `app-arm64-v8a-debug.apk` for a phone,
+`app-x86_64-debug.apk` for an emulator. To sideload, copy the arm64 one to the phone and tap it.
+
+Run the tests with `./gradlew test`.
+
+Step 1 is optional: the app builds and runs without it, with Sections 2 and 3 showing a banner
+instead of faking scores. Section 1 works either way. The model is not committed because it is
+116 MB, past GitHub's file limit.
+
+On Windows there is a scripted emulator path:
+
+```powershell
+.\tools\run-emulator.ps1 -Avd android8    # Android 8.0, the minSdk floor
+.\tools\run-emulator.ps1                  # Android 15
+```
+
+For a machine with no toolchain at all, [SETUP.md](SETUP.md) has the full zero-to-running path,
+including a portable no-admin setup.
+
+**Testing Sections 2 and 3 needs a working microphone.** On an emulator, enable it explicitly:
+toolbar `...` → Microphone → "Virtual microphone uses host audio input". It is off by default,
+so recordings capture silence and everything scores 0%.
 
 ## The three sections
 
