@@ -12,8 +12,10 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 
 import com.example.pronunciation.R;
 import com.example.pronunciation.data.Lesson;
+import com.example.pronunciation.data.LessonRepository;
 import com.example.pronunciation.data.Lessons;
 import com.example.pronunciation.data.Phonemes;
+import com.example.pronunciation.data.PracticeSession;
 import com.example.pronunciation.ui.PracticeFocusViewModel;
 import com.example.pronunciation.databinding.FragmentTrainingBinding;
 import com.example.pronunciation.speech.SpeechEngine;
@@ -21,7 +23,9 @@ import com.example.pronunciation.speech.UtteranceScore;
 import com.example.pronunciation.ui.RecordingFragment;
 import com.example.pronunciation.ui.ScoreFormatter;
 
+import java.util.Collections;
 import java.util.List;
+import java.util.Random;
 
 /**
  * Section 2 — read the prompt, get scored on it, see which sounds were wrong.
@@ -34,7 +38,10 @@ public class TrainingFragment extends RecordingFragment {
     private FragmentTrainingBinding binding;
     private WordScoreAdapter scoreAdapter;
 
-    private List<Lesson> lessons = Lessons.byUnit(Lesson.Unit.WORD);
+    private LessonRepository repository;
+    private PracticeSession session;
+    private Lesson.Unit unit = Lesson.Unit.WORD;
+    private List<Lesson> lessons = Collections.emptyList();
     private int index = 0;
     private boolean busy = false;
     /** Non-null while drilling one sound picked from the Main tab. */
@@ -58,13 +65,15 @@ public class TrainingFragment extends RecordingFragment {
         binding.wordScores.setLayoutManager(new LinearLayoutManager(requireContext()));
         binding.wordScores.setAdapter(scoreAdapter);
 
+        repository = LessonRepository.get(requireContext());
+
         binding.unitChips.setOnCheckedStateChangeListener((group, checkedIds) -> {
             if (checkedIds.isEmpty() || focusPhoneme != null) return;
             int id = checkedIds.get(0);
-            Lesson.Unit unit = id == R.id.chip_sentence ? Lesson.Unit.SENTENCE
+            unit = id == R.id.chip_sentence ? Lesson.Unit.SENTENCE
                     : id == R.id.chip_paragraph ? Lesson.Unit.PARAGRAPH
                     : Lesson.Unit.WORD;
-            lessons = Lessons.byUnit(unit);
+            lessons = session.forUnit(unit);
             index = 0;
             showLesson();
         });
@@ -82,6 +91,17 @@ public class TrainingFragment extends RecordingFragment {
         recorder.setLevelListener(level -> binding.levelMeter.setProgress((int) (level * 100)));
 
         engine.state().observe(getViewLifecycleOwner(), this::onEngineState);
+        newSession();
+    }
+
+    /**
+     * Draws a fresh set of prompts. Called on every visit to the tab, so the learner does not
+     * grind through the same list — the corpus holds thousands, a session shows a handful.
+     */
+    private void newSession() {
+        session = repository.newSession(new Random());
+        lessons = session.forUnit(unit);
+        index = 0;
         showLesson();
     }
 
@@ -94,6 +114,10 @@ public class TrainingFragment extends RecordingFragment {
         if (requested != null) {
             pendingFocus = requested;
             tryApplyPendingFocus();
+        } else if (focusPhoneme == null) {
+            // A focus survives leaving the tab — "Show all" is how you get out of it — so only
+            // reshuffle when the learner is on the ordinary list.
+            newSession();
         }
     }
 
@@ -113,7 +137,8 @@ public class TrainingFragment extends RecordingFragment {
 
     /** Narrows the prompt list to those that actually contain the chosen sound. */
     private void applyFocus(String phoneme) {
-        List<Lesson> matching = Lessons.containingPhoneme(phoneme, engine.lexicon());
+        List<Lesson> matching =
+                Lessons.containingPhoneme(repository.all(), phoneme, engine.lexicon());
 
         if (matching.isEmpty()) {
             // Better to say so than to silently show an unrelated list.
@@ -138,12 +163,10 @@ public class TrainingFragment extends RecordingFragment {
         binding.unitChips.setVisibility(View.VISIBLE);
 
         int checked = binding.unitChips.getCheckedChipId();
-        Lesson.Unit unit = checked == R.id.chip_sentence ? Lesson.Unit.SENTENCE
+        unit = checked == R.id.chip_sentence ? Lesson.Unit.SENTENCE
                 : checked == R.id.chip_paragraph ? Lesson.Unit.PARAGRAPH
                 : Lesson.Unit.WORD;
-        lessons = Lessons.byUnit(unit);
-        index = 0;
-        showLesson();
+        newSession();
     }
 
     private Lesson current() {

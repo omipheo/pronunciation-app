@@ -3,6 +3,7 @@ package com.example.pronunciation;
 import android.app.Application;
 
 import com.example.pronunciation.audio.TtsSpeaker;
+import com.example.pronunciation.data.LessonRepository;
 import com.example.pronunciation.speech.SpeechEngine;
 
 /**
@@ -22,6 +23,10 @@ public class PronunciationApp extends Application {
         tts = new TtsSpeaker(this, null);
         // Warm the model up now so Section 2 is usable by the time the user navigates there.
         SpeechEngine.get(this).init();
+
+        // Parsing ~2000 prompts is fast but not free; do it before the user opens Training
+        // rather than blocking that first frame.
+        new Thread(() -> LessonRepository.get(this), "corpus-warmup").start();
     }
 
     public TtsSpeaker tts() {

@@ -12,7 +12,7 @@ import androidx.annotation.Nullable;
 
 import com.example.pronunciation.R;
 import com.example.pronunciation.data.Lesson;
-import com.example.pronunciation.data.Lessons;
+import com.example.pronunciation.data.LessonRepository;
 import com.example.pronunciation.databinding.FragmentGameBinding;
 import com.example.pronunciation.speech.SpeechEngine;
 import com.example.pronunciation.speech.UtteranceScore;
@@ -98,7 +98,7 @@ public class GameFragment extends RecordingFragment {
     // --- game flow -------------------------------------------------------------------------
 
     private void startGame() {
-        round = Lessons.gameRound(ROUNDS, System.nanoTime());
+        round = LessonRepository.get(requireContext()).gameRound(ROUNDS, System.nanoTime());
         roundIndex = 0;
         totalScore = 0;
         streak = 0;

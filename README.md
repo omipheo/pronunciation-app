@@ -150,12 +150,31 @@ cross-word boundaries, unknown words and silence. That is where scoring bugs hid
 
 ## Content
 
-Practice prompts live in `data/Lessons.java` — **130 of them**: 85 words, 37 sentences, 8
-paragraphs. They lean on the contrasts non-native speakers actually lose: θ/ð, l/ɹ, v/w, ʃ/tʃ/ʒ,
-ɪ/iː, æ/ʌ and the unstressed schwa. A generic sentence scores well without teaching anything, so
-the prompts are deliberately awkward.
+**2280 prompts: 1285 words, 637 sentences, 358 paragraphs.**
 
-Two invariants are enforced rather than assumed:
+Two sources. The 130 in `data/Lessons.java` are hand-written and lean on the contrasts
+non-native speakers actually lose — θ/ð, l/ɹ, v/w, ʃ/tʃ/ʒ, ɪ/iː, æ/ʌ and the unstressed schwa.
+A generic sentence scores well without teaching anything, so those are deliberately awkward.
+
+The remaining 2150 are generated into `assets/prompts.tsv`, which is far too much for Java
+source:
+
+```bash
+python tools/generate_content.py
+```
+
+Words are drawn from a frequency list intersected with the lexicon, then round-robined by their
+hardest sound so the list is not 900 easy words followed by a few hard ones. Sentences come from
+themed frames where verbs live with their theme — sharing one verb pool across themes produced
+"read a healthy salad", grammatical but nonsense a learner would notice. Paragraphs are three
+sentences from one theme using three *different* frames, or they read as the same sentence three
+times.
+
+A learner never sees the flat list. Opening Training draws a fresh **10 words, 8 sentences and
+3 paragraphs** at random (`LessonRepository.newSession`); "1 / 1285" would be discouraging and
+nobody works through a corpus in order.
+
+Two invariants are enforced rather than assumed, across both sources:
 
 ```bash
 python tools/check_content.py

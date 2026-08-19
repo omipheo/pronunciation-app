@@ -112,13 +112,31 @@ def strip_marks(p: str) -> str:
     return p.replace("ˈ", "").replace("ˌ", "").replace("ː", "").strip()
 
 
+def load_generated() -> list[tuple[str, str]]:
+    """The bulk of the corpus, produced by tools/generate_content.py."""
+    tsv = ROOT / "app/src/main/assets/prompts.tsv"
+    if not tsv.exists():
+        print(f"note: {tsv.name} not present — checking curated prompts only")
+        return []
+    out = []
+    for line in tsv.read_text(encoding="utf-8").splitlines():
+        parts = line.split("\t", 2)
+        if len(parts) >= 2:
+            out.append((parts[0], parts[1]))
+    return out
+
+
 def main() -> None:
     lexicon = load_lexicon()
-    prompts = parse_prompts()
+    curated = parse_prompts()
+    generated = load_generated()
+    # Both ship in the APK, so both must satisfy the same invariants.
+    prompts = curated + generated
     failed = False
 
     by_unit = Counter(u for u, _ in prompts)
-    print(f"prompts: {len(prompts)}  " + "  ".join(f"{u.lower()}={n}" for u, n in sorted(by_unit.items())))
+    print(f"prompts: {len(prompts)} ({len(curated)} curated + {len(generated)} generated)  "
+          + "  ".join(f"{u.lower()}={n}" for u, n in sorted(by_unit.items())))
 
     # --- 1. every word must be scorable -------------------------------------------------
     unknown = []

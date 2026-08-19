@@ -6,7 +6,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.Random;
 
 /**
  * Practice content for Sections 2 and 3.
@@ -223,22 +222,32 @@ public final class Lessons {
                     "clear final consonants")
     ));
 
+    /** The hand-written prompts. The bulk of the corpus is generated; see {@link LessonRepository}. */
+    public static List<Lesson> curated() {
+        return ALL;
+    }
+
     /**
-     * Every prompt whose expected pronunciation contains the given sound, easiest unit first.
+     * Every prompt in {@code pool} whose expected pronunciation contains the given sound,
+     * easiest unit first.
      *
      * <p>Backs the "practise this sound" path from the Main tab: a weak sound is only actionable
      * if it leads somewhere that actually drills it.
      *
+     * <p>Takes the pool as an argument rather than reading a global so it can be tested against
+     * a handful of prompts and a small in-memory lexicon.
+     *
      * @return matching prompts, or an empty list if the sound appears in none of them
      */
-    public static List<Lesson> containingPhoneme(String phoneme, Lexicon lexicon) {
+    public static List<Lesson> containingPhoneme(List<Lesson> pool, String phoneme,
+                                                 Lexicon lexicon) {
         List<Lesson> out = new ArrayList<>();
-        if (phoneme == null || lexicon == null || !lexicon.isLoaded()) return out;
+        if (pool == null || phoneme == null || lexicon == null || !lexicon.isLoaded()) return out;
 
         String target = Phonemes.normalize(phoneme);
         if (target.isEmpty()) return out;
 
-        for (Lesson lesson : ALL) {
+        for (Lesson lesson : pool) {
             if (mentions(lesson.text, target, lexicon)) out.add(lesson);
         }
 
@@ -259,22 +268,4 @@ public final class Lessons {
         return false;
     }
 
-    public static List<Lesson> byUnit(Lesson.Unit unit) {
-        List<Lesson> out = new ArrayList<>();
-        for (Lesson lesson : ALL) {
-            if (lesson.unit == unit) out.add(lesson);
-        }
-        return out;
-    }
-
-    public static List<Lesson> all() {
-        return ALL;
-    }
-
-    /** A shuffled run of sentence prompts for one game session. */
-    public static List<Lesson> gameRound(int count, long seed) {
-        List<Lesson> pool = new ArrayList<>(byUnit(Lesson.Unit.SENTENCE));
-        Collections.shuffle(pool, new Random(seed));
-        return pool.subList(0, Math.min(count, pool.size()));
-    }
 }

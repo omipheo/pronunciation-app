@@ -36,7 +36,7 @@ public class LessonFocusTest {
 
     @Test
     public void findsPromptsContainingTheSound() {
-        List<Lesson> matches = Lessons.containingPhoneme("θ", lexicon());
+        List<Lesson> matches = Lessons.containingPhoneme(Lessons.curated(),"θ", lexicon());
 
         assertFalse(matches.isEmpty());
         for (Lesson l : matches) {
@@ -47,12 +47,12 @@ public class LessonFocusTest {
 
     @Test
     public void returnsEmptyForASoundNoPromptUses() {
-        assertTrue(Lessons.containingPhoneme("ʒ", lexicon()).isEmpty());
+        assertTrue(Lessons.containingPhoneme(Lessons.curated(),"ʒ", lexicon()).isEmpty());
     }
 
     @Test
     public void ordersWordsBeforeSentencesBeforeParagraphs() {
-        List<Lesson> matches = Lessons.containingPhoneme("ɪ", lexicon());
+        List<Lesson> matches = Lessons.containingPhoneme(Lessons.curated(),"ɪ", lexicon());
 
         int previous = -1;
         for (Lesson l : matches) {
@@ -65,22 +65,33 @@ public class LessonFocusTest {
     @Test
     public void lengthMarksDoNotSplitASound() {
         assertEquals(
-                Lessons.containingPhoneme("i", lexicon()).size(),
-                Lessons.containingPhoneme("iː", lexicon()).size());
+                Lessons.containingPhoneme(Lessons.curated(),"i", lexicon()).size(),
+                Lessons.containingPhoneme(Lessons.curated(),"iː", lexicon()).size());
     }
 
     @Test
     public void stressMarksDoNotSplitASound() {
         assertEquals(
-                Lessons.containingPhoneme("θ", lexicon()).size(),
-                Lessons.containingPhoneme("ˈθ", lexicon()).size());
+                Lessons.containingPhoneme(Lessons.curated(),"θ", lexicon()).size(),
+                Lessons.containingPhoneme(Lessons.curated(),"ˈθ", lexicon()).size());
     }
 
     @Test
     public void handlesNullsAndUnloadedLexiconWithoutThrowing() {
-        assertTrue(Lessons.containingPhoneme(null, lexicon()).isEmpty());
-        assertTrue(Lessons.containingPhoneme("θ", null).isEmpty());
-        assertTrue(Lessons.containingPhoneme("", lexicon()).isEmpty());
+        assertTrue(Lessons.containingPhoneme(Lessons.curated(),null, lexicon()).isEmpty());
+        assertTrue(Lessons.containingPhoneme(Lessons.curated(),"θ", null).isEmpty());
+        assertTrue(Lessons.containingPhoneme(Lessons.curated(),"", lexicon()).isEmpty());
+        assertTrue(Lessons.containingPhoneme(null, "θ", lexicon()).isEmpty());
+    }
+
+    /** The pool is a parameter precisely so callers can search a subset. */
+    @Test
+    public void searchesOnlyTheGivenPool() {
+        List<Lesson> pool = java.util.Collections.singletonList(
+                new Lesson(Lesson.Unit.WORD, "this", "ð"));
+
+        assertTrue(Lessons.containingPhoneme(pool, "θ", lexicon()).isEmpty());
+        assertEquals(1, Lessons.containingPhoneme(pool, "ð", lexicon()).size());
     }
 
     /** Words absent from the dictionary must be skipped, not crash the filter. */
@@ -89,7 +100,7 @@ public class LessonFocusTest {
         Lexicon sparse = Lexicon.inMemory(
                 java.util.Collections.singletonMap("think", new String[]{"θ", "ɪ", "ŋ", "k"}));
 
-        List<Lesson> matches = Lessons.containingPhoneme("θ", sparse);
+        List<Lesson> matches = Lessons.containingPhoneme(Lessons.curated(),"θ", sparse);
         assertFalse(matches.isEmpty());
     }
 }
