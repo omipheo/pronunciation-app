@@ -51,4 +51,28 @@ public class GameScoringTest {
     public void zeroAttemptsIsTreatedAsOne() {
         assertEquals(GameScoring.pointsFor(80, 1), GameScoring.pointsFor(80, 0));
     }
+
+    @Test
+    public void longerSentencesGetMoreTime() {
+        assertTrue(GameScoring.chaseMillis(20) > GameScoring.chaseMillis(5));
+    }
+
+    /** Even a one-word sentence needs time to tap Record, speak and tap Stop. */
+    @Test
+    public void shortSentencesStillGetReactionTime() {
+        assertTrue(GameScoring.chaseMillis(1) >= 2500);
+    }
+
+    @Test
+    public void isGenerousComparedToNormalReadingSpeed() {
+        // Comfortable reading is ~2.5 words/second, so 10 words is ~4s of speech.
+        long allowed = GameScoring.chaseMillis(10);
+        assertTrue("10 words should get well over 4 seconds", allowed > 6000);
+    }
+
+    @Test
+    public void handlesAZeroOrNegativeWordCount() {
+        assertTrue(GameScoring.chaseMillis(0) > 0);
+        assertEquals(GameScoring.chaseMillis(0), GameScoring.chaseMillis(-5));
+    }
 }

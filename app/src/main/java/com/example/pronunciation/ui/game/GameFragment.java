@@ -58,6 +58,8 @@ public class GameFragment extends RecordingFragment {
     private boolean playing = false;
     private boolean busy = false;
     private boolean abandoned = false;
+    /** True when the run ended because the fish caught up, rather than by finishing or quitting. */
+    private boolean caught = false;
 
     @Nullable
     @Override
@@ -121,6 +123,7 @@ public class GameFragment extends RecordingFragment {
     private void startGame() {
         roundIndex = 0;
         totalScore = 0;
+        caught = false;
         playing = true;
         showPlaying();
         startRound();
@@ -200,9 +203,27 @@ public class GameFragment extends RecordingFragment {
         binding.recordButton.setIconResource(R.drawable.ic_stop);
         binding.levelMeter.setVisibility(View.VISIBLE);
         binding.roundFeedback.setVisibility(View.GONE);
+
+        // The fish sets off the moment recording starts. Finish before it reaches the end of
+        // the sentence.
+        int[] span = problem.spans.get(sentenceIndex);
+        long allowed = GameScoring.chaseMillis(
+                problem.sentences.get(sentenceIndex).split("\\s+").length);
+        binding.passageText.startChase(span[0], span[1], allowed, this::onCaught);
+    }
+
+    /** The fish reached the end of the sentence before the reader did. */
+    private void onCaught() {
+        if (binding == null || !playing) return;
+
+        if (recorder.isRecording()) recorder.cancel();
+        resetRecordButton();
+        caught = true;
+        endGame();
     }
 
     private void stopAndScore() {
+        binding.passageText.stopChase();     // the reader beat the fish to it
         float[] samples = recorder.stop();
         resetRecordButton();
 
@@ -242,6 +263,8 @@ public class GameFragment extends RecordingFragment {
             binding.roundFeedback.setText(retryMessage(score));
             binding.roundFeedback.setTextColor(
                     ScoreFormatter.colourForPercent(requireContext(), score.overallPercent));
+            // Send the fish back to the start of the sentence so the retry is a fair race.
+            binding.passageText.jumpTo(currentSentenceStart());
             return;
         }
 
@@ -301,12 +324,14 @@ public class GameFragment extends RecordingFragment {
     private void endGame() {
         if (binding == null) return;
         playing = false;
+        binding.passageText.stopChase();
         if (recorder.isRecording()) recorder.cancel();
         resetRecordButton();
 
         binding.finalScore.setText(String.valueOf(totalScore));
         binding.finalVerdict.setText(verdictFor(roundIndex));
-        binding.finalStars.setText(stars(roundIndex));
+        // Being caught ends the run outright, however many rounds were behind it.
+        binding.finalStars.setText(caught ? stars(0) : stars(roundIndex));
 
         int best = bestScore();
         if (totalScore > best) {
@@ -330,6 +355,7 @@ public class GameFragment extends RecordingFragment {
     }
 
     private String verdictFor(int roundsCompleted) {
+        if (caught) return getString(R.string.game_verdict_caught, roundsCompleted, ROUNDS);
         if (roundsCompleted >= ROUNDS) return getString(R.string.game_verdict_all);
         return getString(R.string.game_verdict_partial, roundsCompleted, ROUNDS);
     }
@@ -392,6 +418,7 @@ public class GameFragment extends RecordingFragment {
     @Override
     public void onStop() {
         super.onStop();
+        if (binding != null) binding.passageText.stopChase();
         if (playing) {
             playing = false;
             abandoned = true;

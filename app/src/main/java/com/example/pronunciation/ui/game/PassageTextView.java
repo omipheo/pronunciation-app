@@ -1,5 +1,7 @@
 package com.example.pronunciation.ui.game;
 
+import android.animation.Animator;
+import android.animation.AnimatorListenerAdapter;
 import android.animation.ValueAnimator;
 import android.content.Context;
 import android.graphics.Canvas;
@@ -10,6 +12,7 @@ import android.graphics.RectF;
 import android.text.Layout;
 import android.util.AttributeSet;
 import android.view.animation.DecelerateInterpolator;
+import android.view.animation.LinearInterpolator;
 
 import androidx.annotation.Nullable;
 import androidx.appcompat.widget.AppCompatTextView;
@@ -29,6 +32,11 @@ public class PassageTextView extends AppCompatTextView {
     private static final long SWIM_MS = 600;
     private static final float FISH_RADIUS_DP = 8f;
 
+    /** Height of the bob while the fish is chasing, in dp. */
+    private static final float RIPPLE_DP = 3.2f;
+    /** Bobs per second while chasing. */
+    private static final float RIPPLE_HZ = 2.6f;
+
     private final Paint body = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint eye = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Path path = new Path();
@@ -42,6 +50,12 @@ public class PassageTextView extends AppCompatTextView {
     private float fishY = Float.NaN;
     @Nullable
     private ValueAnimator animator;
+
+    /** Non-null while the fish is chasing the reader through a sentence. */
+    @Nullable
+    private ValueAnimator chase;
+    /** Vertical offset applied while chasing, so the fish looks like it is swimming. */
+    private float ripple = 0f;
 
     public PassageTextView(Context context) {
         this(context, null);
@@ -96,6 +110,64 @@ public class PassageTextView extends AppCompatTextView {
         animator.start();
     }
 
+    /**
+     * The fish chases the reader from {@code fromOffset} to {@code toOffset}, bobbing as it
+     * goes. If it gets there first, {@code onCaught} runs.
+     *
+     * <p>Position is interpolated over the character offset rather than between two points, so
+     * the fish follows the text down through line wraps instead of cutting diagonally across
+     * the paragraph.
+     */
+    public void startChase(int fromOffset, int toOffset, long durationMs, Runnable onCaught) {
+        cancelAnimation();
+        stopChase();
+        targetOffset = fromOffset;
+
+        chase = ValueAnimator.ofFloat(fromOffset, toOffset);
+        chase.setDuration(durationMs);
+        chase.setInterpolator(new LinearInterpolator());   // a steady pursuit, no easing
+        chase.addUpdateListener(a -> {
+            float[] p = positionOf(Math.round((float) a.getAnimatedValue()));
+            if (p != null) {
+                fishX = p[0];
+                fishY = p[1];
+            }
+            float elapsed = a.getCurrentPlayTime() / 1000f;
+            ripple = (float) Math.sin(elapsed * RIPPLE_HZ * 2 * Math.PI) * RIPPLE_DP * density;
+            invalidate();
+        });
+        chase.addListener(new AnimatorListenerAdapter() {
+            private boolean cancelled = false;
+
+            @Override
+            public void onAnimationCancel(Animator a) {
+                cancelled = true;
+            }
+
+            @Override
+            public void onAnimationEnd(Animator a) {
+                ripple = 0f;
+                invalidate();
+                if (!cancelled) onCaught.run();
+            }
+        });
+        chase.start();
+    }
+
+    /** Called the moment recording stops; the fish gives up the pursuit. */
+    public void stopChase() {
+        if (chase != null) {
+            chase.cancel();
+            chase = null;
+        }
+        ripple = 0f;
+        invalidate();
+    }
+
+    public boolean isChasing() {
+        return chase != null && chase.isRunning();
+    }
+
     private void cancelAnimation() {
         if (animator != null) {
             animator.cancel();
@@ -107,6 +179,7 @@ public class PassageTextView extends AppCompatTextView {
     protected void onDetachedFromWindow() {
         super.onDetachedFromWindow();
         cancelAnimation();
+        stopChase();
     }
 
     /** Vertical scroll position that brings the current sentence into view, with context above. */
@@ -145,7 +218,8 @@ public class PassageTextView extends AppCompatTextView {
             fishX = p[0];
             fishY = p[1];
         }
-        FishDrawing.draw(canvas, fishX, fishY, FISH_RADIUS_DP * density, body, eye, path, oval);
+        FishDrawing.draw(canvas, fishX, fishY + ripple, FISH_RADIUS_DP * density,
+                body, eye, path, oval);
     }
 
     @Override

@@ -56,7 +56,7 @@
     <string name="your_score">Your score</string>
 
     <string name="game_title">Read it right</string>
-    <string name="game_intro">Ten passages, each harder than the last. Read one sentence at a time — the fish only moves forward when you get it right.</string>
+    <string name="game_intro">Ten passages, each harder than the last. Read a sentence before the fish swims to the end of it — if it catches up, the run is over.</string>
     <string name="game_quit">End game</string>
     <string name="game_no_problems">No game passages are bundled. Run tools/generate_content.py and rebuild.</string>
     <string name="game_sentence_of">%1$s — sentence %2$d of %3$d</string>
@@ -67,6 +67,7 @@
     <string name="game_retry_generic">Not quite — %1$d%%. Read it again.</string>
     <string name="game_verdict_all">All ten passages. Outstanding.</string>
     <string name="game_verdict_partial">You cleared %1$d of %2$d passages.</string>
+    <string name="game_verdict_caught">The fish caught up. You cleared %1$d of %2$d passages before it did.</string>
     <string name="start_game">Start</string>
     <string name="play_again">Play again</string>
     <string name="new_best">New best score!</string>

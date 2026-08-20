@@ -18,6 +18,21 @@ public final class GameScoring {
     /** Floor so a hard-won pass is still worth something. */
     private static final int MINIMUM_POINTS = 10;
 
+    /** Reaction time: tapping Record, drawing breath, tapping Stop. */
+    private static final long CHASE_BASE_MS = 2200;
+    /** Comfortable reading is roughly 2.5 words a second; this is deliberately slower. */
+    private static final long CHASE_PER_WORD_MS = 800;
+
+    /**
+     * How long the reader has before the fish catches up, once Record is pressed.
+     *
+     * <p>Scaled by sentence length rather than fixed — a fixed limit would be trivial on a
+     * five-word sentence and impossible on a twenty-word one.
+     */
+    public static long chaseMillis(int wordCount) {
+        return CHASE_BASE_MS + Math.max(0, wordCount) * CHASE_PER_WORD_MS;
+    }
+
     public static boolean passes(int percent) {
         return percent >= PASS_THRESHOLD;
     }
