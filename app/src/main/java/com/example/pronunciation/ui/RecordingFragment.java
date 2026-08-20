@@ -15,6 +15,7 @@ import androidx.fragment.app.Fragment;
 import com.example.pronunciation.PronunciationApp;
 import com.example.pronunciation.audio.AudioRecorder;
 import com.example.pronunciation.audio.TtsSpeaker;
+import com.example.pronunciation.data.Language;
 import com.example.pronunciation.data.PracticeStats;
 import com.example.pronunciation.speech.SpeechEngine;
 import com.google.android.material.snackbar.Snackbar;
@@ -51,6 +52,10 @@ public abstract class RecordingFragment extends Fragment {
 
     protected TtsSpeaker tts() {
         return PronunciationApp.from(requireContext()).tts();
+    }
+
+    protected Language language() {
+        return PronunciationApp.from(requireContext()).language();
     }
 
     protected boolean hasMicPermission() {

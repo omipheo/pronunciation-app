@@ -28,10 +28,17 @@ public class GameProblem {
     public final List<String> sentences;
     /** {start, end} into {@link #displayText} for each entry in {@link #sentences}. */
     public final List<int[]> spans;
+    /** Pinyin for the whole passage, paragraph-separated; null for languages without one. */
+    public final String romanisation;
 
     public GameProblem(int level, String title, List<String> paragraphs) {
+        this(level, title, paragraphs, null);
+    }
+
+    public GameProblem(int level, String title, List<String> paragraphs, String romanisation) {
         this.level = level;
         this.title = title;
+        this.romanisation = romanisation;
 
         StringBuilder text = new StringBuilder();
         List<String> found = new ArrayList<>();

@@ -11,6 +11,7 @@ import androidx.lifecycle.ViewModelProvider;
 import androidx.recyclerview.widget.LinearLayoutManager;
 
 import com.example.pronunciation.R;
+import com.example.pronunciation.data.Language;
 import com.example.pronunciation.data.Lesson;
 import com.example.pronunciation.data.LessonRepository;
 import com.example.pronunciation.data.Lessons;
@@ -48,6 +49,8 @@ public class TrainingFragment extends RecordingFragment {
     private String focusPhoneme;
     /** Requested before the lexicon finished loading; applied once the engine is ready. */
     private String pendingFocus;
+    /** The language this screen's content was built for; a change re-loads it. */
+    private Language activeLanguage;
 
     @Nullable
     @Override
@@ -65,7 +68,8 @@ public class TrainingFragment extends RecordingFragment {
         binding.wordScores.setLayoutManager(new LinearLayoutManager(requireContext()));
         binding.wordScores.setAdapter(scoreAdapter);
 
-        repository = LessonRepository.get(requireContext());
+        repository = LessonRepository.get(requireContext(), language());
+        activeLanguage = language();
 
         binding.unitChips.setOnCheckedStateChangeListener((group, checkedIds) -> {
             if (checkedIds.isEmpty() || focusPhoneme != null) return;
@@ -111,6 +115,18 @@ public class TrainingFragment extends RecordingFragment {
         String requested = new ViewModelProvider(requireActivity())
                 .get(PracticeFocusViewModel.class)
                 .consume();
+        // Language may have changed on the Main tab while this screen was off-view.
+        if (language() != activeLanguage) {
+            activeLanguage = language();
+            repository = LessonRepository.get(requireContext(), activeLanguage);
+            focusPhoneme = null;
+            pendingFocus = null;
+            binding.focusCard.setVisibility(View.GONE);
+            binding.unitChips.setVisibility(View.VISIBLE);
+            newSession();
+            return;
+        }
+
         if (requested != null) {
             pendingFocus = requested;
             tryApplyPendingFocus();
@@ -179,10 +195,16 @@ public class TrainingFragment extends RecordingFragment {
         binding.promptFocus.setText(lesson.focus);
         binding.promptCounter.setText((index + 1) + " / " + lessons.size());
 
-        // Only single-word prompts get a full IPA line; a whole sentence would be unreadable.
-        String ipa = lesson.text.trim().contains(" ") ? null : engine.expectedIpa(lesson.text);
-        binding.promptIpa.setVisibility(ipa == null ? View.GONE : View.VISIBLE);
-        if (ipa != null) binding.promptIpa.setText("/" + ipa + "/");
+        if (lesson.hasRomanisation()) {
+            // Chinese: pinyin under the hanzi, which is what a learner actually reads from.
+            binding.promptIpa.setVisibility(View.VISIBLE);
+            binding.promptIpa.setText(lesson.romanisation);
+        } else {
+            // English: only single-word prompts get an IPA line; a sentence would be unreadable.
+            String ipa = lesson.text.trim().contains(" ") ? null : engine.expectedIpa(lesson.text);
+            binding.promptIpa.setVisibility(ipa == null ? View.GONE : View.VISIBLE);
+            if (ipa != null) binding.promptIpa.setText("/" + ipa + "/");
+        }
 
         clearResult();
     }

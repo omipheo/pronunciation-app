@@ -10,7 +10,9 @@ import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 import androidx.lifecycle.ViewModelProvider;
 
+import com.example.pronunciation.PronunciationApp;
 import com.example.pronunciation.R;
+import com.example.pronunciation.data.Language;
 import com.example.pronunciation.ui.PracticeFocusViewModel;
 import com.example.pronunciation.data.Phonemes;
 import com.example.pronunciation.data.PracticeStats;
@@ -54,9 +56,47 @@ public class HomeFragment extends Fragment {
         bindSectionCard(binding.linkAlphabet, R.drawable.ic_alphabet,
                 R.string.section_alphabet, R.string.home_link_alphabet, R.id.alphabetFragment);
 
+        bindLanguageToggle();
+
         SpeechEngine engine = SpeechEngine.get(requireContext());
         engine.init();
         engine.state().observe(getViewLifecycleOwner(), this::onEngineState);
+    }
+
+    private void bindLanguageToggle() {
+        PronunciationApp app = PronunciationApp.from(requireContext());
+        Language current = app.language();
+
+        binding.languageToggle.check(
+                current == Language.CHINESE ? R.id.language_zh : R.id.language_en);
+        showLanguageNote(current);
+
+        binding.languageToggle.addOnButtonCheckedListener((group, checkedId, isChecked) -> {
+            if (!isChecked) return;
+
+            Language picked = checkedId == R.id.language_zh ? Language.CHINESE : Language.ENGLISH;
+            if (picked == app.language()) return;
+
+            app.setLanguage(picked);
+            showLanguageNote(picked);
+            // Reloading a 339 MB model is not instant; say so rather than look frozen.
+            showToast(getString(R.string.language_switching, picked.label));
+        });
+    }
+
+    /**
+     * Chinese carries a caveat worth stating on the screen that switches to it: the bundled
+     * model's vocabulary has no third tone, so tone is displayed but never scored.
+     */
+    private void showLanguageNote(Language language) {
+        boolean show = language == Language.CHINESE;
+        binding.languageNote.setVisibility(show ? View.VISIBLE : View.GONE);
+        if (show) binding.languageNote.setText(R.string.language_note_zh);
+    }
+
+    private void showToast(String message) {
+        android.widget.Toast.makeText(requireContext(), message,
+                android.widget.Toast.LENGTH_SHORT).show();
     }
 
     @Override

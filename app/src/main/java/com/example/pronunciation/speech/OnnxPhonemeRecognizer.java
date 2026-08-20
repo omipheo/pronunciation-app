@@ -3,6 +3,8 @@ package com.example.pronunciation.speech;
 import android.content.Context;
 import android.util.Log;
 
+import com.example.pronunciation.data.Language;
+
 import org.json.JSONObject;
 
 import java.io.File;
@@ -39,15 +41,15 @@ public class OnnxPhonemeRecognizer implements PhonemeRecognizer {
 
     private static final String TAG = "OnnxPhonemeRecognizer";
 
-    public static final String MODEL_ASSET = "phoneme_model.onnx";
-    private static final String VOCAB_ASSET = "vocab.json";
-    private static final String CONFIG_ASSET = "model_config.json";
-
     /** Tokenizer bookkeeping symbols that are never real phonemes. */
     private static final Set<String> SPECIAL_TOKENS = new HashSet<>(Arrays.asList(
             "<pad>", "<s>", "</s>", "<unk>", "|", "<blank>", " "));
 
     private final Context appContext;
+    private final Language language;
+    private final String modelAsset;
+    private final String vocabAsset;
+    private final String configAsset;
 
     private OrtEnvironment env;
     private OrtSession session;
@@ -58,12 +60,24 @@ public class OnnxPhonemeRecognizer implements PhonemeRecognizer {
     private volatile boolean ready = false;
 
     public OnnxPhonemeRecognizer(Context context) {
+        this(context, Language.ENGLISH);
+    }
+
+    public OnnxPhonemeRecognizer(Context context, Language language) {
         this.appContext = context.getApplicationContext();
+        this.language = language;
+        this.modelAsset = language.asset("phoneme_model", "onnx");
+        this.vocabAsset = language.asset("vocab", "json");
+        this.configAsset = language.asset("model_config", "json");
     }
 
     /** True when the model asset was bundled at build time. Cheap; safe on the main thread. */
     public static boolean isModelBundled(Context context) {
-        try (InputStream in = context.getAssets().open(MODEL_ASSET)) {
+        return isModelBundled(context, Language.ENGLISH);
+    }
+
+    public static boolean isModelBundled(Context context, Language language) {
+        try (InputStream in = context.getAssets().open(language.asset("phoneme_model", "onnx"))) {
             return in != null;
         } catch (IOException e) {
             return false;
@@ -82,7 +96,7 @@ public class OnnxPhonemeRecognizer implements PhonemeRecognizer {
             readVocab();
 
             // ORT cannot read straight out of the APK, so stage the model in filesDir once.
-            File modelFile = stageAsset(MODEL_ASSET);
+            File modelFile = stageAsset(modelAsset);
 
             env = OrtEnvironment.getEnvironment();
             OrtSession.SessionOptions opts = new OrtSession.SessionOptions();
@@ -95,7 +109,8 @@ public class OnnxPhonemeRecognizer implements PhonemeRecognizer {
             if (inputs.hasNext()) inputName = inputs.next();
 
             ready = true;
-            Log.i(TAG, "Loaded " + MODEL_ASSET + " (" + idToToken.length + " tokens, blank=" + blankId + ")");
+            Log.i(TAG, "Loaded " + modelAsset + " (" + idToToken.length
+                    + " tokens, blank=" + blankId + ")");
             return true;
         } catch (Exception e) {
             Log.e(TAG, "Failed to load phoneme model — Section 2/3 scoring stays disabled", e);
@@ -170,14 +185,14 @@ public class OnnxPhonemeRecognizer implements PhonemeRecognizer {
     }
 
     private void readConfig() throws Exception {
-        JSONObject cfg = new JSONObject(readAssetText(CONFIG_ASSET));
+        JSONObject cfg = new JSONObject(readAssetText(configAsset));
         blankId = cfg.optInt("blank_id", 0);
         normalizeInput = cfg.optBoolean("normalize_input", true);
         inputName = cfg.optString("input_name", "input_values");
     }
 
     private void readVocab() throws Exception {
-        JSONObject vocab = new JSONObject(readAssetText(VOCAB_ASSET));
+        JSONObject vocab = new JSONObject(readAssetText(vocabAsset));
 
         int max = -1;
         Iterator<String> keys = vocab.keys();

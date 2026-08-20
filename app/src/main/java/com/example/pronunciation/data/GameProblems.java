@@ -24,42 +24,52 @@ import java.util.Random;
 public class GameProblems {
 
     private static final String TAG = "GameProblems";
-    private static final String ASSET = "game_problems.tsv";
     private static final String PARAGRAPH_SEPARATOR = "\\|\\|";
 
     public static final int LEVELS = 10;
 
-    private static volatile GameProblems instance;
+    private static final java.util.Map<Language, GameProblems> CACHE =
+            new java.util.EnumMap<>(Language.class);
 
+    private final Language language;
     /** Index 0 is level 1. */
     private final List<List<GameProblem>> byLevel = new ArrayList<>();
 
-    private GameProblems(Context context) {
+    private GameProblems(Context context, Language language) {
+        this.language = language;
         for (int i = 0; i < LEVELS; i++) byLevel.add(new ArrayList<>());
         load(context);
 
         StringBuilder counts = new StringBuilder();
         for (int i = 0; i < LEVELS; i++) counts.append(" L").append(i + 1).append("=").append(byLevel.get(i).size());
-        Log.i(TAG, "Loaded game problems:" + counts);
+        Log.i(TAG, "Loaded game problems [" + language.code + "]:" + counts);
     }
 
     public static GameProblems get(Context context) {
-        if (instance == null) {
-            synchronized (GameProblems.class) {
-                if (instance == null) instance = new GameProblems(context.getApplicationContext());
+        return get(context, Language.ENGLISH);
+    }
+
+    public static GameProblems get(Context context, Language language) {
+        synchronized (CACHE) {
+            GameProblems cached = CACHE.get(language);
+            if (cached == null) {
+                cached = new GameProblems(context.getApplicationContext(), language);
+                CACHE.put(language, cached);
             }
+            return cached;
         }
-        return instance;
     }
 
     private void load(Context context) {
-        try (InputStream in = context.getAssets().open(ASSET);
+        String asset = language.asset("game_problems", "tsv");
+        try (InputStream in = context.getAssets().open(asset);
              BufferedReader reader = new BufferedReader(
                      new InputStreamReader(in, StandardCharsets.UTF_8), 32 * 1024)) {
 
             String line;
             while ((line = reader.readLine()) != null) {
-                String[] parts = line.split("\t", 3);
+                // English: level, title, paragraphs.  Chinese: level, title, pinyin, paragraphs.
+                String[] parts = line.split("\t", 4);
                 if (parts.length < 3) continue;
 
                 int level;
@@ -70,11 +80,15 @@ public class GameProblems {
                 }
                 if (level < 1 || level > LEVELS) continue;
 
-                List<String> paragraphs = Arrays.asList(parts[2].split(PARAGRAPH_SEPARATOR));
-                byLevel.get(level - 1).add(new GameProblem(level, parts[1], paragraphs));
+                String body = parts.length >= 4 ? parts[3] : parts[2];
+                String romanisation = parts.length >= 4 ? parts[2] : null;
+
+                List<String> paragraphs = Arrays.asList(body.split(PARAGRAPH_SEPARATOR));
+                byLevel.get(level - 1).add(
+                        new GameProblem(level, parts[1], paragraphs, romanisation));
             }
         } catch (IOException e) {
-            Log.w(TAG, "No " + ASSET + " bundled — run tools/generate_content.py", e);
+            Log.w(TAG, "No " + asset + " bundled — run the content generator", e);
         }
     }
 

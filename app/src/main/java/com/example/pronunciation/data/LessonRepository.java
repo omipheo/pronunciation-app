@@ -25,17 +25,22 @@ import java.util.Random;
 public class LessonRepository {
 
     private static final String TAG = "LessonRepository";
-    private static final String ASSET = "prompts.tsv";
 
-    private static volatile LessonRepository instance;
+    /** One cached repository per language; the corpora are small enough to keep both. */
+    private static final java.util.Map<Language, LessonRepository> CACHE =
+            new java.util.EnumMap<>(Language.class);
+
+    private final Language language;
 
     private final List<Lesson> all = new ArrayList<>();
     private final List<Lesson> words = new ArrayList<>();
     private final List<Lesson> sentences = new ArrayList<>();
     private final List<Lesson> paragraphs = new ArrayList<>();
 
-    private LessonRepository(Context context) {
-        all.addAll(Lessons.curated());
+    private LessonRepository(Context context, Language language) {
+        this.language = language;
+        // The hand-written prompts are English; Chinese comes entirely from its asset.
+        if (language == Language.ENGLISH) all.addAll(Lessons.curated());
         loadGenerated(context);
 
         for (Lesson lesson : all) {
@@ -51,28 +56,36 @@ public class LessonRepository {
                     break;
             }
         }
-        Log.i(TAG, "Corpus: " + words.size() + " words, " + sentences.size()
-                + " sentences, " + paragraphs.size() + " paragraphs");
+        Log.i(TAG, "Corpus [" + language.code + "]: " + words.size() + " words, "
+                + sentences.size() + " sentences, " + paragraphs.size() + " paragraphs");
     }
 
     /** Blocking on first call (~2000 lines of TSV). Warm it off the main thread at startup. */
     public static LessonRepository get(Context context) {
-        if (instance == null) {
-            synchronized (LessonRepository.class) {
-                if (instance == null) instance = new LessonRepository(context.getApplicationContext());
+        return get(context, Language.ENGLISH);
+    }
+
+    public static LessonRepository get(Context context, Language language) {
+        synchronized (CACHE) {
+            LessonRepository cached = CACHE.get(language);
+            if (cached == null) {
+                cached = new LessonRepository(context.getApplicationContext(), language);
+                CACHE.put(language, cached);
             }
+            return cached;
         }
-        return instance;
     }
 
     private void loadGenerated(Context context) {
-        try (InputStream in = context.getAssets().open(ASSET);
+        String asset = language.asset("prompts", "tsv");
+        try (InputStream in = context.getAssets().open(asset);
              BufferedReader reader = new BufferedReader(
                      new InputStreamReader(in, StandardCharsets.UTF_8), 32 * 1024)) {
 
             String line;
             while ((line = reader.readLine()) != null) {
-                String[] parts = line.split("\t", 3);
+                // English: unit, text, focus.  Chinese: unit, hanzi, pinyin, focus.
+                String[] parts = line.split("\t", 4);
                 if (parts.length < 3) continue;
 
                 Lesson.Unit unit;
@@ -81,11 +94,16 @@ public class LessonRepository {
                 } catch (IllegalArgumentException e) {
                     continue;  // unknown unit in a regenerated file; skip rather than crash
                 }
-                all.add(new Lesson(unit, parts[1], parts[2]));
+
+                if (parts.length >= 4) {
+                    all.add(new Lesson(unit, parts[1], parts[3], parts[2]));
+                } else {
+                    all.add(new Lesson(unit, parts[1], parts[2]));
+                }
             }
         } catch (IOException e) {
             // Not fatal: the curated prompts alone still make a usable app.
-            Log.w(TAG, "No " + ASSET + " bundled — run tools/generate_content.py", e);
+            Log.w(TAG, "No " + asset + " bundled — run the content generator", e);
         }
     }
 

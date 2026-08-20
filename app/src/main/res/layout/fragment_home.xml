@@ -29,6 +29,42 @@
             android:textColor="?android:attr/textColorSecondary"
             tools:text="You have practised 3 days in a row." />
 
+        <!-- Practice language. Switching it swaps the model, the corpus and the voice. -->
+        <com.google.android.material.button.MaterialButtonToggleGroup
+            android:id="@+id/language_toggle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            app:selectionRequired="true"
+            app:singleSelection="true">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/language_en"
+                style="?attr/materialButtonOutlinedStyle"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/language_english" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/language_zh"
+                style="?attr/materialButtonOutlinedStyle"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/language_chinese" />
+        </com.google.android.material.button.MaterialButtonToggleGroup>
+
+        <TextView
+            android:id="@+id/language_note"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:textAppearance="?attr/textAppearanceBodySmall"
+            android:textColor="?android:attr/textColorSecondary"
+            android:visibility="gone"
+            tools:text="Tone is shown but not scored." />
+
         <com.google.android.material.card.MaterialCardView
             android:id="@+id/engine_banner"
             android:layout_width="match_parent"

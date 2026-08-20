@@ -3,6 +3,17 @@
     <string name="app_name">Pronunciation</string>
 
     <string name="section_home">Main</string>
+    <string name="section_syllables">Pinyin</string>
+
+    <string name="language_english">English</string>
+    <string name="language_chinese">中文</string>
+    <string name="language_note_zh">Initials, finals and vowels are scored. Tone is shown but not scored — the bundled model has no third tone.</string>
+    <string name="language_switching">Switching to %1$s…</string>
+
+    <string name="syllables_header">Chinese has no alphabet. These are the pieces every syllable is built from.</string>
+    <string name="syllables_initials">Initials 声母</string>
+    <string name="syllables_finals">Finals 韵母</string>
+    <string name="syllables_tones">Tones 声调</string>
     <string name="section_alphabet">Alphabet</string>
     <string name="section_training">Training</string>
     <string name="section_game">Game</string>

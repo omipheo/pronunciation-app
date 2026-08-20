@@ -60,6 +60,8 @@ public class GameFragment extends RecordingFragment {
     private boolean abandoned = false;
     /** True when the run ended because the fish caught up, rather than by finishing or quitting. */
     private boolean caught = false;
+    /** The language this screen's passages came from; a change reloads them. */
+    private com.example.pronunciation.data.Language activeLanguage;
 
     @Nullable
     @Override
@@ -72,7 +74,8 @@ public class GameFragment extends RecordingFragment {
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
-        problems = GameProblems.get(requireContext());
+        problems = GameProblems.get(requireContext(), language());
+        activeLanguage = language();
 
         int fishColor = ContextCompat.getColor(requireContext(), R.color.fish);
         int waterColor = ContextCompat.getColor(requireContext(), R.color.water);
@@ -409,7 +412,19 @@ public class GameFragment extends RecordingFragment {
     @Override
     public void onStart() {
         super.onStart();
-        if (abandoned && binding != null) {
+        if (binding == null) return;
+
+        // Language may have changed on the Main tab; a run in progress uses the old passages.
+        if (language() != activeLanguage) {
+            activeLanguage = language();
+            problems = GameProblems.get(requireContext(), activeLanguage);
+            playing = false;
+            abandoned = false;
+            showIdle();
+            return;
+        }
+
+        if (abandoned) {
             abandoned = false;
             showIdle();
         }

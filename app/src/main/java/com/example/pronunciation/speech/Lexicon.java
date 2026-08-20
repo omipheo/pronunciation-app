@@ -3,6 +3,8 @@ package com.example.pronunciation.speech;
 import android.content.Context;
 import android.util.Log;
 
+import com.example.pronunciation.data.Language;
+
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
@@ -24,15 +26,23 @@ import java.util.Map;
 public class Lexicon {
 
     private static final String TAG = "Lexicon";
-    private static final String LEXICON_ASSET = "lexicon.txt";
 
     private final Map<String, String[]> entries = new HashMap<>(140_000);
     private volatile boolean loaded = false;
+    private Language language = Language.ENGLISH;
 
     /** Blocking; ~1-2 s for the full dictionary. Call from a worker thread. */
     public boolean load(Context context) {
+        return load(context, Language.ENGLISH);
+    }
+
+    /** Blocking; loads the dictionary for one language. Call from a worker thread. */
+    public boolean load(Context context, Language language) {
         if (loaded) return true;
-        try (InputStream in = context.getAssets().open(LEXICON_ASSET);
+        this.language = language;
+
+        String assetName = language.asset("lexicon", "txt");
+        try (InputStream in = context.getAssets().open(assetName);
              BufferedReader reader = new BufferedReader(
                      new InputStreamReader(in, StandardCharsets.UTF_8), 64 * 1024)) {
 
@@ -41,6 +51,7 @@ public class Lexicon {
                 int tab = line.indexOf('\t');
                 if (tab <= 0) continue;
 
+                // Chinese keys are hanzi, where lowercasing is a no-op; harmless either way.
                 String word = line.substring(0, tab).toLowerCase(Locale.ROOT);
                 String[] phonemes = line.substring(tab + 1).trim().split("\\s+");
                 if (phonemes.length > 0 && !phonemes[0].isEmpty()) {
@@ -48,12 +59,16 @@ public class Lexicon {
                 }
             }
             loaded = true;
-            Log.i(TAG, "Loaded " + entries.size() + " lexicon entries");
+            Log.i(TAG, "Loaded " + entries.size() + " entries from " + assetName);
             return true;
         } catch (IOException e) {
-            Log.e(TAG, "Failed to load " + LEXICON_ASSET, e);
+            Log.e(TAG, "Failed to load " + assetName, e);
             return false;
         }
+    }
+
+    public Language language() {
+        return language;
     }
 
     public boolean isLoaded() {
@@ -77,12 +92,37 @@ public class Lexicon {
 
     /** Splits text into words as they should be scored, keeping the original spelling for display. */
     public static List<String> tokenize(String text) {
-        List<String> words = new ArrayList<>();
-        for (String raw : text.split("\\s+")) {
-            String cleaned = normalize(raw);
-            if (!cleaned.isEmpty()) words.add(raw);
+        return tokenize(text, Language.ENGLISH);
+    }
+
+    /**
+     * Splits text into the units that get scored.
+     *
+     * <p>Chinese is written without spaces, so splitting on whitespace would hand the scorer a
+     * whole sentence as one token and find nothing in the dictionary. Each hanzi is one
+     * syllable, which is also the right granularity to give feedback on.
+     */
+    public static List<String> tokenize(String text, Language language) {
+        List<String> out = new ArrayList<>();
+        if (text == null) return out;
+
+        if (language.splitsByCharacter()) {
+            for (int i = 0; i < text.length(); i++) {
+                char c = text.charAt(i);
+                if (isHan(c)) out.add(String.valueOf(c));
+            }
+            return out;
         }
-        return words;
+
+        for (String raw : text.split("\\s+")) {
+            if (!normalize(raw).isEmpty()) out.add(raw);
+        }
+        return out;
+    }
+
+    /** CJK Unified Ideographs, the block Simplified Chinese lives in. */
+    public static boolean isHan(char c) {
+        return c >= 0x4E00 && c <= 0x9FFF;
     }
 
     /**
@@ -94,6 +134,10 @@ public class Lexicon {
      * ASCII English regardless of who is holding the phone.
      */
     public static String normalize(String word) {
+        if (word == null) return "";
+        // A hanzi is already its own token; stripping non-[a-z] would erase it entirely.
+        if (!word.isEmpty() && isHan(word.charAt(0))) return word;
+
         return word.toLowerCase(Locale.ROOT)
                 .replaceAll("^[^a-z']+", "")
                 .replaceAll("[^a-z']+$", "");

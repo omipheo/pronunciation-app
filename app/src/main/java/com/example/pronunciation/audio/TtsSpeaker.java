@@ -25,19 +25,37 @@ public class TtsSpeaker {
         void onReady(boolean available);
     }
 
+    private Locale locale = Locale.US;
+
     public TtsSpeaker(Context context, ReadyListener listener) {
+        this(context, Locale.US, listener);
+    }
+
+    public TtsSpeaker(Context context, Locale locale, ReadyListener listener) {
+        this.locale = locale;
         tts = new TextToSpeech(context.getApplicationContext(), status -> {
             if (status == TextToSpeech.SUCCESS) {
-                int result = tts.setLanguage(Locale.US);
-                ready = result != TextToSpeech.LANG_MISSING_DATA
-                        && result != TextToSpeech.LANG_NOT_SUPPORTED;
-                if (!ready) Log.w(TAG, "US English voice data is not installed");
+                ready = applyLocale(this.locale);
             } else {
                 Log.e(TAG, "TTS init failed with status " + status);
                 ready = false;
             }
             if (listener != null) listener.onReady(ready);
         });
+    }
+
+    /** Switches voice when the practice language changes. */
+    public void setLanguage(Locale locale) {
+        this.locale = locale;
+        if (tts != null) ready = applyLocale(locale);
+    }
+
+    private boolean applyLocale(Locale target) {
+        int result = tts.setLanguage(target);
+        boolean ok = result != TextToSpeech.LANG_MISSING_DATA
+                && result != TextToSpeech.LANG_NOT_SUPPORTED;
+        if (!ok) Log.w(TAG, "No voice data installed for " + target);
+        return ok;
     }
 
     public boolean isReady() {

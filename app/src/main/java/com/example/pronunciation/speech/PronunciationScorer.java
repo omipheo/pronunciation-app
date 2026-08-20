@@ -1,5 +1,7 @@
 package com.example.pronunciation.speech;
 
+import com.example.pronunciation.data.Language;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -16,13 +18,19 @@ public class PronunciationScorer {
     private static final double INSERTION_PENALTY = 0.5;
 
     private final Lexicon lexicon;
+    private final Language language;
 
     public PronunciationScorer(Lexicon lexicon) {
+        this(lexicon, Language.ENGLISH);
+    }
+
+    public PronunciationScorer(Lexicon lexicon, Language language) {
         this.lexicon = lexicon;
+        this.language = language;
     }
 
     public UtteranceScore score(String targetText, List<String> recognized) {
-        List<String> words = Lexicon.tokenize(targetText);
+        List<String> words = Lexicon.tokenize(targetText, language);
 
         // Flatten the target into one phoneme stream, remembering which word each came from.
         List<String> expected = new ArrayList<>();
@@ -157,8 +165,27 @@ public class PronunciationScorer {
         return strip(a).equals(strip(b));
     }
 
-    private static String strip(String p) {
-        return p.replace("ˈ", "").replace("ˌ", "").replace("ː", "").trim();
+    /**
+     * Drops stress, length and Mandarin tone marks.
+     *
+     * <p>Tone is stripped because the bundled Chinese model's vocabulary has no tone 3 at all
+     * and covers the others unevenly — comparing tones it cannot emit would mark every
+     * third-tone syllable wrong no matter how well it was said. Tone is shown in the pinyin
+     * instead, for the learner to check by ear.
+     *
+     * <p>Harmless for English: no English IPA token ends in a digit.
+     */
+    static String strip(String p) {
+        String s = p.replace("ˈ", "").replace("ˌ", "").replace("ː", "").trim();
+
+        int end = s.length();
+        while (end > 0) {
+            char c = s.charAt(end - 1);
+            if ((c >= '1' && c <= '5') || c == 'ɜ') end--;
+            else break;
+        }
+        // Never strip a token down to nothing; "ɜ" alone is a phoneme in its own right.
+        return end == 0 ? s : s.substring(0, end);
     }
 
     /** Convenience for the game screen, which only needs a pass/fail verdict. */

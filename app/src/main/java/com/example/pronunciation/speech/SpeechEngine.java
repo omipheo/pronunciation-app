@@ -8,6 +8,8 @@ import android.util.Log;
 import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
 
+import com.example.pronunciation.data.Language;
+
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -53,6 +55,9 @@ public class SpeechEngine {
     private OnnxPhonemeRecognizer recognizer;
     private Lexicon lexicon;
     private PronunciationScorer scorer;
+    private Language language = Language.ENGLISH;
+    /** Set while a switch is pending, so a stale load cannot overwrite the newer one. */
+    private volatile long loadGeneration = 0;
 
     private SpeechEngine(Context context) {
         this.appContext = context.getApplicationContext();
@@ -79,31 +84,74 @@ public class SpeechEngine {
     public void init() {
         State current = state.getValue();
         if (current == State.LOADING || current == State.READY) return;
+        load(language);
+    }
 
+    public Language language() {
+        return language;
+    }
+
+    /**
+     * Switches practice language, unloading the current model first.
+     *
+     * <p>Only one model is ever resident: English is 116 MB and Chinese 339 MB, and holding
+     * both would be careless on a mid-range phone for no benefit — nobody practises two
+     * languages in the same breath.
+     */
+    public void setLanguage(Language next) {
+        if (next == language && state.getValue() == State.READY) return;
+        language = next;
+        load(next);
+    }
+
+    private void load(Language target) {
+        final long generation = ++loadGeneration;
         state.setValue(State.LOADING);
+
         worker.execute(() -> {
-            if (!OnnxPhonemeRecognizer.isModelBundled(appContext)) {
-                Log.w(TAG, "No phoneme model in assets — run tools/prepare_assets.py");
-                mainHandler.post(() -> state.setValue(State.MODEL_MISSING));
+            // Free the old model before allocating the new one, not after.
+            if (recognizer != null) {
+                recognizer.close();
+                recognizer = null;
+            }
+            lexicon = null;
+            scorer = null;
+
+            if (!OnnxPhonemeRecognizer.isModelBundled(appContext, target)) {
+                Log.w(TAG, "No model for " + target.code + " — run tools/prepare_assets.py --lang "
+                        + target.code);
+                publish(generation, State.MODEL_MISSING);
                 return;
             }
 
             Lexicon loadedLexicon = new Lexicon();
-            boolean lexiconOk = loadedLexicon.load(appContext);
+            boolean lexiconOk = loadedLexicon.load(appContext, target);
 
-            OnnxPhonemeRecognizer loadedRecognizer = new OnnxPhonemeRecognizer(appContext);
+            OnnxPhonemeRecognizer loadedRecognizer = new OnnxPhonemeRecognizer(appContext, target);
             boolean modelOk = loadedRecognizer.load();
 
             if (!lexiconOk || !modelOk) {
                 loadedRecognizer.close();
-                mainHandler.post(() -> state.setValue(State.ERROR));
+                publish(generation, State.ERROR);
+                return;
+            }
+
+            // A newer switch started while this was loading; drop this result.
+            if (generation != loadGeneration) {
+                loadedRecognizer.close();
                 return;
             }
 
             lexicon = loadedLexicon;
             recognizer = loadedRecognizer;
-            scorer = new PronunciationScorer(loadedLexicon);
-            mainHandler.post(() -> state.setValue(State.READY));
+            scorer = new PronunciationScorer(loadedLexicon, target);
+            publish(generation, State.READY);
+        });
+    }
+
+    private void publish(long generation, State newState) {
+        mainHandler.post(() -> {
+            if (generation == loadGeneration) state.setValue(newState);
         });
     }
 
@@ -140,8 +188,9 @@ public class SpeechEngine {
 
     /** The expected IPA for a word, for display next to a prompt. Null if unknown or not loaded. */
     public String expectedIpa(String word) {
-        if (lexicon == null) return null;
-        String[] phonemes = lexicon.lookup(word);
+        Lexicon current = lexicon;
+        if (current == null) return null;
+        String[] phonemes = current.lookup(word);
         if (phonemes == null) return null;
 
         StringBuilder sb = new StringBuilder();
