@@ -29,6 +29,23 @@ from pathlib import Path
 # quantise onto a phone, and trained to transcribe what was *said*, not what was meant.
 DEFAULT_MODEL = "bookbot/wav2vec2-ljspeech-gruut"
 
+# Per-language models. Mandarin needs the multilingual espeak model: it is the one with the
+# retroflex and alveolo-palatal inventory (ʈ ʂ ʐ ɕ tɕ ts) that Mandarin depends on. It is
+# wav2vec2-LARGE, so expect roughly three times the English model's size.
+#
+# Known limitation, checked against its vocabulary: tone 3 is absent entirely and the other
+# tones cover vowels unevenly. Segments are scored; tone is shown to the learner but not
+# scored, because a tone score this model cannot support would be worse than none.
+MODELS = {
+    "en": DEFAULT_MODEL,
+    "zh": "facebook/wav2vec2-lv-60-espeak-cv-ft",
+}
+
+
+def asset_name(stem: str, lang: str, ext: str) -> str:
+    """English keeps the unsuffixed names so existing installs and code paths are untouched."""
+    return f"{stem}.{ext}" if lang == "en" else f"{stem}_{lang}.{ext}"
+
 CMUDICT_URL = "https://raw.githubusercontent.com/cmusphinx/cmudict/master/cmudict.dict"
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -61,7 +78,7 @@ def log(msg: str) -> None:
 # Model export
 # --------------------------------------------------------------------------------------
 
-def export_model(model_id: str, quantize: bool) -> dict:
+def export_model(model_id: str, quantize: bool, lang: str = "en") -> dict:
     try:
         import torch
         from transformers import Wav2Vec2CTCTokenizer, Wav2Vec2FeatureExtractor, Wav2Vec2ForCTC
@@ -75,8 +92,8 @@ def export_model(model_id: str, quantize: bool) -> dict:
     tokenizer = Wav2Vec2CTCTokenizer.from_pretrained(model_id)
     extractor = Wav2Vec2FeatureExtractor.from_pretrained(model_id)
 
-    fp32_path = ASSETS / "phoneme_model_fp32.onnx"
-    final_path = ASSETS / "phoneme_model.onnx"
+    fp32_path = ASSETS / f"phoneme_model_fp32_{lang}.onnx"
+    final_path = ASSETS / asset_name("phoneme_model", lang, "onnx")
 
     log("Exporting to ONNX …")
     dummy = torch.randn(1, 16000)  # one second of audio; the axis is dynamic
@@ -121,7 +138,7 @@ def export_model(model_id: str, quantize: bool) -> dict:
     log(f"Wrote {final_path.name} ({size_mb:.0f} MB)")
 
     vocab = tokenizer.get_vocab()
-    (ASSETS / "vocab.json").write_text(
+    (ASSETS / asset_name("vocab", lang, "json")).write_text(
         json.dumps(vocab, ensure_ascii=False, indent=0), encoding="utf-8"
     )
 
@@ -131,12 +148,16 @@ def export_model(model_id: str, quantize: bool) -> dict:
 
     config = {
         "model_id": model_id,
+        "language": lang,
         "blank_id": int(blank_id),
         "input_name": "input_values",
         "normalize_input": bool(getattr(extractor, "do_normalize", True)),
         "sample_rate": int(getattr(extractor, "sampling_rate", 16000)),
+        # Mandarin tone is encoded as a digit on the vowel, but the vocabulary is missing
+        # tone 3 and covers the others unevenly, so scoring strips it.
+        "score_tones": False if lang == "zh" else None,
     }
-    (ASSETS / "model_config.json").write_text(
+    (ASSETS / asset_name("model_config", lang, "json")).write_text(
         json.dumps(config, indent=2), encoding="utf-8"
     )
     log(f"Vocab: {len(vocab)} tokens, blank id {blank_id}")
@@ -251,7 +272,11 @@ def report_unmapped(vocab: set[str]) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--model", default=DEFAULT_MODEL, help="HuggingFace model id")
+    parser.add_argument("--lang", default="en", choices=sorted(MODELS),
+                        help="which language's assets to build")
+    parser.add_argument("--model", default=None, help="override the model id for this language")
+    parser.add_argument("--model-only", action="store_true",
+                        help="skip the lexicon (Chinese uses tools/build_lexicon_zh.py)")
     parser.add_argument("--no-quantize", action="store_true",
                         help="keep fp32 (3-4x larger, marginally more accurate)")
     parser.add_argument("--lexicon-only", action="store_true",
@@ -262,15 +287,25 @@ def main() -> None:
     cache_dir = REPO_ROOT / "tools" / ".cache"
     cache_dir.mkdir(exist_ok=True)
 
+    lang = args.lang
+    model_id = args.model or MODELS[lang]
+
     if args.lexicon_only:
-        vocab_path = ASSETS / "vocab.json"
+        vocab_path = ASSETS / asset_name("vocab", lang, "json")
         if not vocab_path.exists():
-            sys.exit("vocab.json not found — run without --lexicon-only first")
+            sys.exit(f"{vocab_path.name} not found — run without --lexicon-only first")
         vocab = json.loads(vocab_path.read_text(encoding="utf-8"))
     else:
-        vocab = export_model(args.model, quantize=not args.no_quantize)
+        vocab = export_model(model_id, quantize=not args.no_quantize, lang=lang)
 
     vocab_tokens = set(vocab.keys())
+
+    if args.model_only or lang != "en":
+        # The CMUdict pipeline below is English-only; Mandarin gets its lexicon from
+        # tools/build_lexicon_zh.py, which goes through pypinyin rather than a word list.
+        log(f"Model assets for '{lang}' written. Lexicon step skipped.")
+        return
+
     report_unmapped(vocab_tokens)
     build_lexicon(vocab_tokens, cache_dir)
 

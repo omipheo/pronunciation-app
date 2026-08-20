@@ -13,10 +13,10 @@ local.properties
 .claude/settings.local.json
 
 # Generated assets — large binaries, rebuild with tools/prepare_assets.py
-app/src/main/assets/phoneme_model.onnx
-app/src/main/assets/lexicon.txt
-app/src/main/assets/vocab.json
-app/src/main/assets/model_config.json
+app/src/main/assets/phoneme_model*.onnx
+app/src/main/assets/lexicon*.txt
+app/src/main/assets/vocab*.json
+app/src/main/assets/model_config*.json
 tools/.cache/
 
 # Python
