@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -42,29 +43,44 @@ def log(m: str) -> None:
     print(f"[lexicon-zh] {m}", flush=True)
 
 
-def phonemise(lines: list[str]) -> list[str]:
-    """One espeak call for the whole batch — per-character calls take minutes."""
+# espeak sometimes appends fragments of its own argv - "(en)siː(cmn)" is the letter C,
+# "(en)baɜksla1ʃ(cmn)" is "backslash" - by reading past the end of the input buffer. It is
+# non-deterministic and only ever trails the real output, so it is stripped rather than
+# worked around.
+ARGV_LEAK = re.compile(r"\(en\).*?\(cmn\)")
+
+def phonemise(items: list[str]) -> list[str]:
+    """One espeak call per character, so each result maps to a known input.
+
+    Two traps here, both found the hard way:
+
+    - Chinese cannot survive the Windows ANSI codepage as a command-line argument, so text
+      goes through a UTF-8 file. Passing it directly produced silently empty output.
+    - Batching is tempting and wrong. espeak emits the batch as one whitespace-separated
+      stream, but not always one token per character; a single character yielding none
+      shifted every result after it, and 中 came out as the phonemes for a different word
+      entirely. There is no way to detect that from the output alone. Per-character calls
+      cost about thirty seconds and cannot misalign.
+    """
     if not ESPEAK.exists():
         sys.exit(f"espeak-ng not found at {ESPEAK}. See the module docstring.")
 
+    env = dict(os.environ, ESPEAK_DATA_PATH=str(ESPEAK_DATA))
+    out: list[str] = []
+
     with tempfile.TemporaryDirectory() as tmp:
         src = Path(tmp) / "in.txt"
-        # Chinese cannot survive the Windows ANSI codepage as a command-line argument, so the
-        # text goes through a UTF-8 file. This silently produced empty output when passed
-        # directly.
-        src.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        for i, item in enumerate(items):
+            src.write_text(item + "\n", encoding="utf-8")
+            result = subprocess.run(
+                [str(ESPEAK), "-v", "cmn", "--ipa", "-q", "-f", str(src)],
+                capture_output=True, env=env,
+            )
+            text = result.stdout.decode("utf-8", errors="replace")
+            out.append(ARGV_LEAK.sub("", text).strip())
 
-        env = dict(os.environ, ESPEAK_DATA_PATH=str(ESPEAK_DATA))
-        result = subprocess.run(
-            [str(ESPEAK), "-v", "cmn", "--ipa", "-q", "-f", str(src)],
-            capture_output=True, env=env,
-        )
-        text = result.stdout.decode("utf-8", errors="replace")
-
-    out = [ln.strip() for ln in text.splitlines()]
-    # espeak emits one line per input line, but drops empties; re-align defensively.
-    if len(out) != len(lines):
-        log(f"WARNING: espeak returned {len(out)} lines for {len(lines)} inputs")
+            if (i + 1) % 50 == 0:
+                log(f"   {i + 1}/{len(items)}")
     return out
 
 

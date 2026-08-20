@@ -1,0 +1,58 @@
+INITIAL	b	爸	bà	unaspirated p
+INITIAL	p	怕	pà	aspirated p
+INITIAL	m	妈	mā	m
+INITIAL	f	发	fā	f
+INITIAL	d	大	dà	unaspirated t
+INITIAL	t	他	tā	aspirated t
+INITIAL	n	那	nà	n
+INITIAL	l	来	lái	l
+INITIAL	k	开	kāi	aspirated k
+INITIAL	h	好	hǎo	h, further back than English
+INITIAL	j	见	jiàn	tongue flat, lips spread
+INITIAL	q	去	qù	aspirated j
+INITIAL	x	谢	xiè	between English s and sh
+INITIAL	zh	中	zhōng	retroflex, tongue curled back
+INITIAL	ch	吃	chī	aspirated zh
+INITIAL	sh	是	shì	retroflex sh
+INITIAL	r	人	rén	retroflex, not rolled
+INITIAL	z	早	zǎo	flat ts
+INITIAL	c	菜	cài	aspirated z
+INITIAL	s	三	sān	flat s
+FINAL	a	大	dà	
+FINAL	o	我	wǒ	
+FINAL	e	饿	è	
+FINAL	i	一	yī	
+FINAL	u	五	wǔ	
+FINAL	ü	女	nǚ	
+FINAL	ai	爱	ài	
+FINAL	ei	杯	bēi	
+FINAL	ao	好	hǎo	
+FINAL	ou	口	kǒu	
+FINAL	an	安	ān	
+FINAL	en	很	hěn	
+FINAL	ang	忙	máng	
+FINAL	eng	冷	lěng	
+FINAL	ong	东	dōng	
+FINAL	ia	家	jiā	
+FINAL	ie	谢	xiè	
+FINAL	iao	小	xiǎo	
+FINAL	iu	六	liù	
+FINAL	ian	天	tiān	
+FINAL	in	新	xīn	
+FINAL	iang	两	liǎng	
+FINAL	ing	明	míng	
+FINAL	iong	穷	qióng	
+FINAL	ua	花	huā	
+FINAL	uo	国	guó	
+FINAL	uai	快	kuài	
+FINAL	ui	水	shuǐ	
+FINAL	uan	关	guān	
+FINAL	un	问	wèn	
+FINAL	uang	黄	huáng	
+FINAL	üe	月	yuè	
+FINAL	üan	元	yuán	
+FINAL	ün	云	yún	
+TONE	1	妈	mā	high and level
+TONE	2	麻	má	rising, like a question
+TONE	3	马	mǎ	dips down then rises
+TONE	4	骂	mà	sharp fall
