@@ -148,9 +148,38 @@ English workflow, Chinese for Mandarin.
 
 ---
 
-## 5. Get the APK
+## 5. Build the APK and find it
 
-After `assembleDebug`, three APKs are in `app/build/outputs/apk/debug/`:
+### Build it
+
+From the project root:
+
+```powershell
+.\gradlew.bat assembleDebug            # gradlew on macOS/Linux
+```
+
+### Find it
+
+The APKs are written to `app/build/outputs/apk/debug/`. Full path on a default install:
+
+```
+C:\pronunciation-app\app\build\outputs\apk\debug\
+```
+
+List them, newest first:
+
+```powershell
+Get-ChildItem app\build\outputs\apk\debug\*.apk |
+    Select-Object Name, @{n='MB';e={[math]::Round($_.Length/1MB)}}, LastWriteTime
+```
+
+Or just open the folder:
+
+```powershell
+explorer app\build\outputs\apk\debug
+```
+
+### Which one
 
 | File | Size | Use |
 |---|---|---|
@@ -158,16 +187,69 @@ After `assembleDebug`, three APKs are in `app/build/outputs/apk/debug/`:
 | `app-x86_64-debug.apk` | ~486 MB | emulators |
 | `app-universal-debug.apk` | ~536 MB | when the target is unknown |
 
+Installing the wrong one fails with `INSTALL_FAILED_NO_MATCHING_ABIS` — that means an x86_64
+APK on an ARM phone, or the reverse.
+
 They are large because both speech models ship inside: 116 MB English plus 339 MB Mandarin.
 ONNX Runtime also carries a ~17 MB native library per architecture, which is why the build
 splits by ABI rather than shipping one universal APK.
 
-**To sideload**, copy the arm64 file to the phone by any means — cloud drive, USB storage,
-email — tap it, and allow *"install from unknown sources"*. It is signed with the debug
-keystore: fine for testing, not publishable.
+### Put it on a phone
 
-To build a smaller APK for one language, delete the other model from
-`app/src/main/assets/` before building. English alone gives roughly 145 MB.
+Over USB:
+
+```powershell
+adb install -r app\build\outputs\apk\debug\app-arm64-v8a-debug.apk
+```
+
+Or **sideload** with no cable: copy the arm64 file across by any means — cloud drive, USB
+storage, email to yourself — tap it on the phone, and allow *"install from unknown sources"*.
+
+Debug APKs are signed with the debug keystore. That is fine for testing and sideloading, but
+Google Play will not accept one.
+
+### A smaller APK
+
+Delete the model you do not need from `app/src/main/assets/` before building:
+
+```powershell
+Remove-Item app\src\main\assets\phoneme_model_zh.onnx     # English only, ~145 MB
+```
+
+The app still runs — the missing language shows a banner instead of scoring. Re-generate it
+later with `python tools/prepare_assets.py --lang zh`.
+
+### Release build
+
+```powershell
+.\gradlew.bat assembleRelease
+```
+
+Output lands in `app/build/outputs/apk/release/`:
+
+```
+app-arm64-v8a-release-unsigned.apk    478 MB
+app-x86_64-release-unsigned.apk       481 MB
+app-universal-release-unsigned.apk    531 MB
+```
+
+Barely smaller than debug — R8 shrinks code, and this APK is almost entirely model weights.
+
+There is no signing config in this project, so those **will not install** until you sign them:
+
+```powershell
+# 1. one-off: create a keystore
+keytool -genkey -v -keystore my.keystore -alias key0 -keyalg RSA -keysize 2048 -validity 10000
+
+# 2. sign and align
+$bt = "$env:ANDROID_HOME\build-tools\35.0.0"
+& "$bt\zipalign.exe" -p 4 app-arm64-v8a-release-unsigned.apk app-release-aligned.apk
+& "$bt\apksigner.bat" sign --ks my.keystore --out app-release.apk app-release-aligned.apk
+```
+
+Release also runs R8 with the ProGuard rules in `app/proguard-rules.pro`, which keep
+`ai.onnxruntime.**` — that library is reached by JNI and reflection, and stripping it breaks
+scoring at runtime rather than at build time.
 
 ---
 
